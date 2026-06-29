@@ -1,0 +1,5073 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flesh & Blood 收購價對比看板</title>
+    <meta name="description" content="互動式 Flesh & Blood 庫存卡牌收購價對比看板，支援多種加成與出價最佳化比較。">
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const div = document.createElement('div');
+            div.style.position = 'fixed';
+            div.style.top = '0';
+            div.style.left = '0';
+            div.style.width = '100%';
+            div.style.background = '#ef4444';
+            div.style.color = '#fff';
+            div.style.padding = '20px';
+            div.style.zIndex = '9999';
+            div.style.fontFamily = 'monospace';
+            div.style.fontSize = '14px';
+            div.style.whiteSpace = 'pre-wrap';
+            div.innerHTML = '<strong>JS Error:</strong> ' + message + '<br>Source: ' + source + '<br>Line: ' + lineno + '<br>Col: ' + colno;
+            document.body.appendChild(div);
+            return false;
+        };
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-tf: #3b82f6; /* Blue for Tokyo Fab */
+            --accent-tf-light: rgba(59, 130, 246, 0.15);
+            --accent-fb: #10b981; /* Emerald for Fable */
+            --accent-fb-light: rgba(16, 185, 129, 0.15);
+            --accent-highlight: #f59e0b; /* Amber */
+            --accent-highlight-light: rgba(245, 158, 11, 0.1);
+            --border-color: #334155;
+            --border-hover: #475569;
+            --font-outfit: 'Outfit', 'Inter', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+            --shadow-premium: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-inter);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+        }
+
+        /* Sidebar styling */
+        .sidebar {
+            width: 320px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 30px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h1 {
+            font-family: var(--font-outfit);
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            background: linear-gradient(135deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-header p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mode-list {
+            list-style: none;
+            padding: 20px 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .mode-item {
+            padding: 14px 18px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+            transition: var(--transition-smooth);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .mode-item:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+        }
+
+        .mode-item.active {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+            box-shadow: var(--shadow-premium);
+        }
+
+        .mode-title {
+            font-family: var(--font-outfit);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .mode-desc {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        /* Main content layout */
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            height: 100vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        /* Header metric cards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: var(--shadow-premium);
+            transition: var(--transition-smooth);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-hover);
+        }
+
+        .metric-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+
+        .metric-card.tf::after { background-color: var(--accent-tf); }
+        .metric-card.fb::after { background-color: var(--accent-fb); }
+        .metric-card.total::after { background-color: var(--accent-highlight); }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-family: var(--font-outfit);
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .metric-subtext {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Filter block styling */
+        .filter-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            box-shadow: var(--shadow-premium);
+        }
+
+        .search-wrapper {
+            flex-grow: 1;
+            min-width: 250px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            transition: var(--transition-smooth);
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-tf);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .filter-select {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+            min-width: 130px;
+            transition: var(--transition-smooth);
+        }
+
+        .filter-select:focus {
+            border-color: var(--accent-tf);
+        }
+
+        /* Split view display for best deals */
+        .split-view-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .split-column {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-premium);
+        }
+
+        .split-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .split-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .split-title {
+            font-family: var(--font-outfit);
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .split-title.tf { color: var(--accent-tf); }
+        .split-title.fb { color: var(--accent-fb); }
+
+        .split-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .split-badge.tf { background-color: var(--accent-tf-light); color: var(--accent-tf); }
+        .split-badge.fb { background-color: var(--accent-fb-light); color: var(--accent-fb); }
+
+        .split-subtext {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .split-total {
+            font-family: var(--font-outfit);
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .split-list-body {
+            max-height: 500px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        /* Card List Table for Single Mode */
+        .table-container {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-premium);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .table-header-block {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            font-family: var(--font-outfit);
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .table-scroll {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background-color: var(--bg-tertiary);
+            padding: 14px 20px;
+            font-weight: 600;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            z-index: 1;
+        }
+
+        td {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Items in lists styling */
+        .card-row-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: var(--transition-smooth);
+        }
+
+        .card-row-item:hover {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        .card-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            max-width: 70%;
+        }
+
+        .card-name-code {
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .card-meta-tags {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .card-code-tag {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .card-foil-badge {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .card-foil-badge.normal { background-color: rgba(255, 255, 255, 0.05); color: var(--text-secondary); }
+        .card-foil-badge.rf { background-color: var(--accent-tf-light); color: var(--accent-tf); }
+        .card-foil-badge.cf { background-color: var(--accent-fb-light); color: var(--accent-fb); }
+
+        .card-rarity-badge {
+            font-size: 9px;
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--accent-highlight);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .card-pricing-details {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 3px;
+        }
+
+        .card-earning-val {
+            font-family: var(--font-outfit);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-calc-detail {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        /* Utility classes */
+        .bold-val {
+            font-weight: 600;
+        }
+
+        .currency-symbol {
+            font-size: 0.8em;
+            margin-right: 2px;
+            opacity: 0.8;
+        }
+
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Responsive breakpoints */
+        @media (max-width: 1024px) {
+            body {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .mode-list {
+                display: flex;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding: 15px;
+                gap: 10px;
+            }
+            .mode-item {
+                flex-shrink: 0;
+                margin-bottom: 0;
+                width: 200px;
+            }
+            .main-content {
+                height: auto;
+                padding: 20px;
+            }
+            .split-view-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar with modes -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>FaB Card Buy Compare</h1>
+            <p>庫存收購對比儀表板</p>
+        </div>
+        <ul class="mode-list">
+            <li class="mode-item active" onclick="switchMode(1)">
+                <span class="mode-title">1. TOKYO FAB (一般)</span>
+                <span class="mode-desc">全數出售給 TOKYO FAB 正常價</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(2)">
+                <span class="mode-title">2. FABLE (一般)</span>
+                <span class="mode-desc">全數出售給 FABLE 正常價</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(3)">
+                <span class="mode-title">3. TOKYO FAB (+15%)</span>
+                <span class="mode-desc">TOKYO FAB 所有收價加成 15%</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(4)">
+                <span class="mode-title">4. FABLE (+10%)</span>
+                <span class="mode-desc">FABLE 所有收價加成 10%</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(5)">
+                <span class="mode-title">5. 最佳出價比較 (無加成)</span>
+                <span class="mode-desc">每種單卡各別售給出價高者</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(6)">
+                <span class="mode-title">6. 最佳出價 (TF+15% vs FB)</span>
+                <span class="mode-desc">TF加成15% 與 FABLE正常價對比分配</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(7)">
+                <span class="mode-title">7. 最佳出價 (TF vs FB+10%)</span>
+                <span class="mode-desc">TF正常價 與 FABLE加成10%對比分配</span>
+            </li>
+            <li class="mode-item" onclick="switchMode(8)">
+                <span class="mode-title">8. 最佳出價 (TF+15% vs FB+10%)</span>
+                <span class="mode-desc">雙平台皆獲加成對比分配</span>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <!-- Summary metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card total">
+                <span class="metric-label">預估總計收益</span>
+                <span class="metric-value" id="metric-total-value"><span class="currency-symbol">¥</span>0</span>
+                <span class="metric-subtext" id="metric-total-subtext">所有擁有卡片出售估價</span>
+            </div>
+            <div class="metric-card tf">
+                <span class="metric-label">TOKYO FAB 收益</span>
+                <span class="metric-value" id="metric-tf-value"><span class="currency-symbol">¥</span>0</span>
+                <span class="metric-subtext" id="metric-tf-subtext">分配給 TOKYO FAB 總值</span>
+            </div>
+            <div class="metric-card fb">
+                <span class="metric-label">FABLE 收益</span>
+                <span class="metric-value" id="metric-fb-value"><span class="currency-symbol">¥</span>0</span>
+                <span class="metric-subtext" id="metric-fb-subtext">分配給 FABLE 總值</span>
+            </div>
+        </div>
+
+        <!-- Real-time Filters -->
+        <div class="filter-card">
+            <div class="search-wrapper">
+                <input type="text" id="search-bar" class="search-input" placeholder="搜尋卡片名稱或代碼 (如 Voltaris / OMN000)..." oninput="applyFilters()">
+            </div>
+            <select id="filter-set" class="filter-select" onchange="applyFilters()">
+                <option value="all">所有系列</option>
+                <option value="OMEN of the third age">Omen of the Third Age (OMN)</option>
+                <option value="COMPENDIUM OF RATHE">Compendium of Rathe (PEN)</option>
+                <option value="ANTIQUITY PACK">Antiquity Pack (ANQ)</option>
+            </select>
+            <select id="filter-rarity" class="filter-select" onchange="applyFilters()">
+                <option value="all">所有稀有度</option>
+                <option value="Marvel">Marvel</option>
+                <option value="F">Fabled (F)</option>
+                <option value="L">Legendary (L)</option>
+                <option value="M">Majestic (M)</option>
+                <option value="R">Rare (R)</option>
+                <option value="C">Common (C)</option>
+            </select>
+        </div>
+
+        <!-- Render Container (dynamically switched between table and split columns) -->
+        <div id="view-render-container"></div>
+    </div>
+
+    <!-- Embedded Data and logic -->
+    <script>
+        // Embedded raw JSON data for owned cards
+        const CARD_DATA = [
+    {
+        "name":  "[Runeblade] Runechant of Pride (Yellow)",
+        "code":  "IAR155",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  9000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  11200,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Runeblade] Runechant of Sloth (Yellow)",
+        "code":  "IAR156",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  7000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  11200,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Voltaris (Blue)",
+        "code":  "OMN000",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  8,
+                     "normal":  0
+                 },
+        "rarity":  "F",
+        "tf_prices":  {
+                          "cf":  60000,
+                          "rf":  33000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  48000,
+                          "rf":  30000,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Zyggy Starlight (Hero)",
+        "code":  "OMN001",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  12000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  14400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Zyggy (Hero)",
+        "code":  "OMN002",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  10,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1100,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Unwinding Finality (Red)",
+        "code":  "OMN004",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  61
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  4500,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  6000,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Flicker Reality (Blue)",
+        "code":  "OMN005",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  19,
+                     "normal":  67
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  400,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  700,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Circular Flowtide (Yellow)",
+        "code":  "OMN033",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  10,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  1200,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Elliptical Conflux (Yellow)",
+        "code":  "OMN034",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  11,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  1000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Nebulus Cycle (Yellow)",
+        "code":  "OMN035",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  1100,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Crackle from Afar (Blue)",
+        "code":  "OMN036",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  13,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Fleeing Starbreeze (Blue)",
+        "code":  "OMN037",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  16,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  1200,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Nourishing Glow (Blue)",
+        "code":  "OMN038",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  15,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Illusionist] Fingers of Fragmentation (Equipment)",
+        "code":  "OMN039",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  10,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Illusionist] Fractal Creation (Blue)",
+        "code":  "OMN040",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  13,
+                     "rf":  0,
+                     "normal":  73
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2800,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Lightning Runeblade] Aurora, Legacy of Tempest (Hero)",
+        "code":  "OMN047",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  16000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  19200,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Runeblade] Aurora, Emissary of Lightning (Hero)",
+        "code":  "OMN048",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Runeblade] Snap Fingers (Equipment)",
+        "code":  "OMN050",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  10,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Runeblade] Tempestuous Kiss (Red)",
+        "code":  "OMN051",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  60
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  6000,
+                          "rf":  null,
+                          "normal":  250
+                      },
+        "fb_prices":  {
+                          "cf":  6000,
+                          "rf":  null,
+                          "normal":  500
+                      }
+    },
+    {
+        "name":  "[Lightning Runeblade] Arcanic Reproach (Blue)",
+        "code":  "OMN052",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  16,
+                     "normal":  65
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  100,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Runeblade] Gauntlet of Sword and Sorcery (Equipment)",
+        "code":  "OMN086",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  8,
+                     "rf":  18,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  7000,
+                          "rf":  3500,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  8400,
+                          "rf":  1800,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Runeblade] Caress of the Reaper (Red)",
+        "code":  "OMN087",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  11,
+                     "rf":  0,
+                     "normal":  66
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Lightning Wizard] Oscilio, Forked Continuum (Hero)",
+        "code":  "OMN094",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  12000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  15600,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Wizard] Oscilio, Scion of the Third Age (Hero)",
+        "code":  "OMN095",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Wizard] Constella Waves (Equipment)",
+        "code":  "OMN097",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  18,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  50,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  200,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Wizard] Astral Bridge (Red)",
+        "code":  "OMN098",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  9,
+                     "rf":  0,
+                     "normal":  72
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  6000,
+                          "rf":  null,
+                          "normal":  300
+                      },
+        "fb_prices":  {
+                          "cf":  4800,
+                          "rf":  null,
+                          "normal":  900
+                      }
+    },
+    {
+        "name":  "[Lightning Wizard] Echoflash (Yellow)",
+        "code":  "OMN099",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  16,
+                     "normal":  69
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  700,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  700,
+                          "normal":  300
+                      }
+    },
+    {
+        "name":  "[Wizard] Tome of Quandaries (Blue)",
+        "code":  "OMN133",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  68
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Illusionist / Wizard] Third Eye of the Sphinx (Equipment)",
+        "code":  "OMN140",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  23,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  8000,
+                          "rf":  2500,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  9600,
+                          "rf":  2500,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Plutonic Starplate (Equipment)",
+        "code":  "OMN141",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  9,
+                     "rf":  19,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  10000,
+                          "rf":  6000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  9000,
+                          "rf":  5000,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Constella Tiara (Equipment)",
+        "code":  "OMN142",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  10,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Starflow Robes (Equipment)",
+        "code":  "OMN143",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  8,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  50,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  10,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Laced Lightning (Equipment)",
+        "code":  "OMN144",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "C",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  10,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Astral Strike (Red)",
+        "code":  "OMN145",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  19,
+                     "normal":  67
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Lightning] Flowstate Embodiment (Red)",
+        "code":  "OMN146",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  16,
+                     "normal":  62
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  1400,
+                          "normal":  1000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1900,
+                          "normal":  1200
+                      }
+    },
+    {
+        "name":  "[Lightning] Static Shelter (Yellow)",
+        "code":  "OMN147",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  11,
+                     "rf":  0,
+                     "normal":  67
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  4000,
+                          "rf":  null,
+                          "normal":  900
+                      },
+        "fb_prices":  {
+                          "cf":  4800,
+                          "rf":  null,
+                          "normal":  1100
+                      }
+    },
+    {
+        "name":  "[Lightning] Sigil of Astral Flow (Blue)",
+        "code":  "OMN199",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning] Spellbane Sigil (Blue)",
+        "code":  "OMN201",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1100,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Elemental] Lightning Flow (Token)",
+        "code":  "OMN203A",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  9000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Elemental] Lightning Flow (Token)",
+        "code":  "OMN203B",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  10000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Elemental] Lightning Flow (Token)",
+        "code":  "OMN203C",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  7500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Boots of Omnis Ward (Equipment)",
+        "code":  "OMN204",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  13,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  14000,
+                          "rf":  8000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  18000,
+                          "rf":  7000,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Browbeat (Blue)",
+        "code":  "OMN213",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  12,
+                     "rf":  0,
+                     "normal":  71
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  1800,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Generic] Step Between (Red)",
+        "code":  "OMN214",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  21,
+                     "normal":  73
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  900,
+                          "normal":  600
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1100,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Tempt Over (Yellow)",
+        "code":  "OMN215",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  24,
+                     "normal":  57
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  100,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Assassin] Unmake the Underlings (Blue)",
+        "code":  "OMN228",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  11,
+                     "normal":  72
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  1500,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1500,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Brute] Feral Instinct (Yellow)",
+        "code":  "OMN229",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  10,
+                     "rf":  0,
+                     "normal":  61
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2800,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Guardian] Pile Driver (Weapon)",
+        "code":  "OMN230",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  28
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ninja] Swift Pickup (Red)",
+        "code":  "OMN231",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  9,
+                     "normal":  71
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  600,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ninja] Evasive Nageboshi (Blue)",
+        "code":  "OMN232",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  26
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ninja] Razor Ring (Blue)",
+        "code":  "OMN233",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  24
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ninja] Stun Star (Blue)",
+        "code":  "OMN234",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  27
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Gear Turner (Red)",
+        "code":  "OMN235",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  13,
+                     "rf":  0,
+                     "normal":  67
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Arcbane Grasp (Blue)",
+        "code":  "OMN236",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  68
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1800,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ranger] Settle the Bill (Red)",
+        "code":  "OMN237",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  10,
+                     "normal":  76
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  100,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Warrior] Beckon Steel (Blue)",
+        "code":  "OMN238",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  15,
+                     "normal":  72
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  1200,
+                          "normal":  800
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1300,
+                          "normal":  900
+                      }
+    },
+    {
+        "name":  "[Pirate Mechanologist] Crash Site Salvage (Yellow)",
+        "code":  "OMN239",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  12,
+                     "rf":  0,
+                     "normal":  76
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  4500,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Pirate Necromancer] Golden Skull (Yellow)",
+        "code":  "OMN240",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2300,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate Necromancer] Golden Skull (Yellow)",
+        "code":  "OMN240",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  68
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2300,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate Ranger] Red Lure Harpoon (Blue)",
+        "code":  "OMN241",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  10,
+                     "normal":  72
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  600,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Guardian / Warrior] Fortitude of Anvilheim (Equipment)",
+        "code":  "OMN242",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  17,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  7000,
+                          "rf":  1200,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  9600,
+                          "rf":  2100,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Guardian / Warrior] A Bit off the Side (Red)",
+        "code":  "OMN243",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  13,
+                     "rf":  0,
+                     "normal":  69
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2200,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  2600,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Light] Blessing of Aegis (Yellow)",
+        "code":  "OMN244",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  12,
+                     "rf":  0,
+                     "normal":  61
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  1800,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Draconic] Draco Fire (Red)",
+        "code":  "OMN245",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  7,
+                     "normal":  75
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  2000,
+                          "normal":  400
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1600,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Chaos] Induce Panic (Yellow)",
+        "code":  "OMN246",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  7,
+                     "normal":  73
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  400,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Reviled Guardian] Lionclaw Maul (Weapon)",
+        "code":  "OMN247",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  23
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Starfield Veil (Equipment)",
+        "code":  "OMN248",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  8,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  900,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Starfield Carapace (Equipment)",
+        "code":  "OMN249",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  900,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Lightning Illusionist] Starfield Touch (Equipment)",
+        "code":  "OMN250",
+        "set":  "OMEN of the third age",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  900,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Brute] Savage Claw (Weapon)",
+        "code":  "PEN001",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  7
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Brute] Reckless Arithmetic (Blue)",
+        "code":  "PEN006",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  7,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  30,
+                          "normal":  2
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Brute] Lay Down the Challenge (Yellow)",
+        "code":  "PEN007",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  36
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1300,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Guardian] Shield Beater (Weapon)",
+        "code":  "PEN015",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  14
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  2
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Guardian] Seismic Shift (Red)",
+        "code":  "PEN020",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  13,
+                     "normal":  33
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Guardian] Sense Weakness (Blue)",
+        "code":  "PEN021",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  4,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  3000,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  3000,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Ninja] Wind Cutter (Equipment)",
+        "code":  "PEN029",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  21
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  1000,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ninja] Gentle Breeze (Red)",
+        "code":  "PEN034",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  4,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1400,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ninja] Tigerine Reflex (Red)",
+        "code":  "PEN035",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  10,
+                     "normal":  38
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  150,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  400,
+                          "normal":  300
+                      }
+    },
+    {
+        "name":  "[Warrior] Templar Spellbane (Equipment)",
+        "code":  "PEN043",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  14
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  250,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  500,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Warrior] Swordmaster\u0027s Shine (Red)",
+        "code":  "PEN048",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  9,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  700,
+                          "normal":  500
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  900,
+                          "normal":  700
+                      }
+    },
+    {
+        "name":  "[Warrior] Blunten (Yellow)",
+        "code":  "PEN049",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  4,
+                     "normal":  37
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  8000,
+                          "normal":  1200
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  7200,
+                          "normal":  900
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Synapse Sparkcap (Equipment)",
+        "code":  "PEN057",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  700,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Ghost Protocol: Architect (Red)",
+        "code":  "PEN062",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  8,
+                     "normal":  36
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Ghost Protocol: Mainframe (Blue)",
+        "code":  "PEN063",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  5,
+                     "normal":  38
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Evo Beta Base Head (Blue)",
+        "code":  "PEN068",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Evo Beta Base Chest (Blue)",
+        "code":  "PEN069",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Evo Beta Base Arms (Blue)",
+        "code":  "PEN070",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Evo Beta Base Legs (Blue)",
+        "code":  "PEN071",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  600,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Ranger] Farflight Longbow (Weapon)",
+        "code":  "PEN078",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  18
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ranger] Tiger Trap (Red)",
+        "code":  "PEN083",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  31
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ranger] Rune Snare (Red)",
+        "code":  "PEN084",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  7,
+                     "normal":  37
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Runeblade] Grimoire of Fellingsong (Equipment)",
+        "code":  "PEN092",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  22
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Runeblade] Beckoning Haunt (Equipment)",
+        "code":  "PEN095",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  150,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1100,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Runeblade] Doomsaying (Red)",
+        "code":  "PEN097",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  39
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  400,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Runeblade] Sigil of Gravespawning (Blue)",
+        "code":  "PEN098",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2600,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Runeblade] Sigil of Gravespawning (Blue)",
+        "code":  "PEN098",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  32
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2600,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Runeblade] Sigil of Silphidae (Blue)",
+        "code":  "PEN099",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1600,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Wizard] Tempest Dancers (Equipment)",
+        "code":  "PEN106",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  18
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  500,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Wizard] Glyph Destruction Nodes (Yellow)",
+        "code":  "PEN111",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  37
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  400,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Wizard] Temporal Wobble (Red)",
+        "code":  "PEN112",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  7,
+                     "normal":  36
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  1000,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1200,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Illusionist] Touch of Reality (Equipment)",
+        "code":  "PEN122",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  400,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Illusionist] Lunar Mirage (Red)",
+        "code":  "PEN127",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  6,
+                     "normal":  38
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  500,
+                          "normal":  300
+                      }
+    },
+    {
+        "name":  "[Illusionist] Mind Meets Might (Red)",
+        "code":  "PEN128",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  2,
+                     "normal":  37
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  600,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  3000,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Assassin] Graven Gaslight (Equipment)",
+        "code":  "PEN136",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Assassin] Lobotomy (Red)",
+        "code":  "PEN141",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  11,
+                     "normal":  36
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  100,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  300
+                      }
+    },
+    {
+        "name":  "[Assassin] Seeker Kunai (Red)",
+        "code":  "PEN142",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  11,
+                     "normal":  34
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Necromancer] Bone Puppetry (Equipment)",
+        "code":  "PEN151",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  150,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate Necromancer] Boo, Resident Spook (Yellow)",
+        "code":  "PEN156",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  37
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate Necromancer] Boo, Resident Spook (Yellow)",
+        "code":  "PEN156",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  3,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  800,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate Necromancer] Bubba-Lubba, Run Aground (Yellow)",
+        "code":  "PEN157",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  5,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  600,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate Necromancer] Bubba-Lubba, Run Aground (Yellow)",
+        "code":  "PEN157",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  38
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  600,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate] Gloves of Azure Waves (Equipment)",
+        "code":  "PEN167",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  150,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  500,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Pirate] Cheating Scoundrel (Red)",
+        "code":  "PEN169",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  9,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  4500,
+                          "normal":  700
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  4800,
+                          "normal":  900
+                      }
+    },
+    {
+        "name":  "[Light] Solforge Gauntlet (Equipment)",
+        "code":  "PEN179",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  100
+                      }
+    },
+    {
+        "name":  "[Light] Blessing of Bellona (Yellow)",
+        "code":  "PEN181",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  5,
+                     "normal":  37
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  1600,
+                          "rf":  null,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  4000,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Shadow] Vestige of Flagellation (Equipment)",
+        "code":  "PEN191",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  11
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  150,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  200,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Shadow] Embalm (Yellow)",
+        "code":  "PEN193",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  5,
+                     "normal":  32
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Elemental] Elemental Strike (Red)",
+        "code":  "PEN205",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  14,
+                     "normal":  36
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  100,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Earth] Crown of Everbloom (Equipment)",
+        "code":  "PEN215",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  16
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  30
+                      },
+        "fb_prices":  {
+                          "cf":  2100,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Earth] Channel the Skybreaker (Yellow)",
+        "code":  "PEN217",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  33
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  200,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  1800,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Ice] Crown of Frozen Thoughts (Equipment)",
+        "code":  "PEN227",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  8,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Ice] Channel Iceloch Glaze (Blue)",
+        "code":  "PEN229",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  31
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2700,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Lightning] Stormweaver\u0027s Aegis (Equipment)",
+        "code":  "PEN239",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  150,
+                          "rf":  null,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  1000,
+                          "rf":  null,
+                          "normal":  300
+                      }
+    },
+    {
+        "name":  "[Lightning] Astravolt Elemental (Red)",
+        "code":  "PEN241",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  3,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  4000,
+                          "normal":  300
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  4800,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Draconic] Dynastic Diadem (Equipment)",
+        "code":  "PEN252",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  1200,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  2800,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Draconic] Art of the Phoenix: War (Red)",
+        "code":  "PEN254",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  9,
+                     "normal":  36
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  700,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Mystic] Rippling Wave (Equipment)",
+        "code":  "PEN265",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  400,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  900,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Mystic] Whispering Mist (Blue)",
+        "code":  "PEN267",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  2,
+                     "normal":  35
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  300,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  1600,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Chaos] Havoc Wrap (Equipment)",
+        "code":  "PEN275",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  150,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Chaos] Tome of Pandemonium (Yellow)",
+        "code":  "PEN277",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  38
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  1800,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  4000,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Revered] Glory Plate (Equipment)",
+        "code":  "PEN287",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  16
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  400,
+                          "rf":  null,
+                          "normal":  30
+                      },
+        "fb_prices":  {
+                          "cf":  300,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Revered] By the Book (Blue)",
+        "code":  "PEN289",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  6,
+                     "normal":  40
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  50,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Reviled] Two-Faced (Equipment)",
+        "code":  "PEN299",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  500,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  1200,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Reviled] Leave \u0027Em Speechless (Blue)",
+        "code":  "PEN301",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  2,
+                     "normal":  40
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  200,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Balance of Justice (Equipment)",
+        "code":  "PEN309",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  2
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  14400
+                      }
+    },
+    {
+        "name":  "[Generic] Crown of Providence (Equipment)",
+        "code":  "PEN310",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  3
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  10000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  12800
+                      }
+    },
+    {
+        "name":  "[Generic] Fyendal\u0027s Spring Tunic (Equipment)",
+        "code":  "PEN311",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  2
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  15000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  19200
+                      }
+    },
+    {
+        "name":  "[Generic] Stonewall Gauntlet (Equipment)",
+        "code":  "PEN312",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  5
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  700
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  1500
+                      }
+    },
+    {
+        "name":  "[Generic] Quickdodge Flexors (Equipment)",
+        "code":  "PEN313",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  4
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  9000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  7000
+                      }
+    },
+    {
+        "name":  "[Generic] Helm of Safe Haven (Equipment)",
+        "code":  "PEN314",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  6,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  200,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  200,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Generic] Command and Conquer (Red)",
+        "code":  "PEN319",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  7500
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  8400
+                      }
+    },
+    {
+        "name":  "[Generic] Enlightened Strike (Red)",
+        "code":  "PEN320",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  3000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  3500
+                      }
+    },
+    {
+        "name":  "[Generic] Shelter from the Storm (Red)",
+        "code":  "PEN321",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  13
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  9000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  9800
+                      }
+    },
+    {
+        "name":  "[Generic] Rockyard Rodeo (Blue)",
+        "code":  "PEN322",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  8,
+                     "normal":  31
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  30,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  400,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] High Current Currency (Blue)",
+        "code":  "PEN323",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  9,
+                     "normal":  38
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  30,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  800,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Brute] Rhinar (Hero)",
+        "code":  "PEN334",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1200,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Ninja] Benji, the Piercing Wind (Hero)",
+        "code":  "PEN335",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1700,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Warrior] Kassai, Cintari Sellsword (Hero)",
+        "code":  "PEN336",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Dash, Database (Hero)",
+        "code":  "PEN337",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2100,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Dash (Hero)",
+        "code":  "PEN338",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Mechanologist] Teklovossen (Hero)",
+        "code":  "PEN339",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1600,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Ranger] Azalea (Hero)",
+        "code":  "PEN340",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1800,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1800,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Ranger] Riptide (Hero)",
+        "code":  "PEN341",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  1300,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Wizard] Kano (Hero)",
+        "code":  "PEN342",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  1500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  4000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Light Illusionist] Prism (Hero)",
+        "code":  "PEN343",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  4,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Shadow Runeblade] Chane (Hero)",
+        "code":  "PEN344",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  5,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Elemental Guardian] Oldhim (Hero)",
+        "code":  "PEN345",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Elemental Ranger] Lexi (Hero)",
+        "code":  "PEN346",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  5500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  5000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Draconic Illusionist] Dromai (Hero)",
+        "code":  "PEN347",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  4000,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  4000,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Draconic Ninja] Fai (Hero)",
+        "code":  "PEN348",
+        "set":  "COMPENDIUM OF RATHE",
+        "qtys":  {
+                     "cf":  7,
+                     "rf":  0,
+                     "normal":  0
+                 },
+        "rarity":  "Marvel",
+        "tf_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  2500,
+                          "rf":  null,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Heart of Fyendal (Blue)",
+        "code":  "ANQ001",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  2
+                 },
+        "rarity":  "F",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  44000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  40000
+                      }
+    },
+    {
+        "name":  "[Generic] Riches of Tropal-Dhani (Yellow)",
+        "code":  "ANQ003",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  2
+                 },
+        "rarity":  "F",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  75000
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  64000
+                      }
+    },
+    {
+        "name":  "[Generic] Balance of Justice (Equipment)",
+        "code":  "ANQ004",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  2,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  23000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  28800,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Crown of Providence (Equipment)",
+        "code":  "ANQ005",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  22000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  28800,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Fyendal\u0027s Spring Tunic (Equipment)",
+        "code":  "ANQ006",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  140000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  126000,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Stonewall Gauntlet (Equipment)",
+        "code":  "ANQ007",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  10000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  9000,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Quickdodge Flexors (Equipment)",
+        "code":  "ANQ008",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  18000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  25200,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Command and Conquer (Red)",
+        "code":  "ANQ009",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  26000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  28800,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Shelter from the Storm (Red)",
+        "code":  "ANQ010",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  1,
+                     "normal":  0
+                 },
+        "rarity":  "L",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  25000,
+                          "normal":  null
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  28800,
+                          "normal":  null
+                      }
+    },
+    {
+        "name":  "[Generic] Amnesia (Red)",
+        "code":  "ANQ011",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  11
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  500
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Censor (Red)",
+        "code":  "ANQ012",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  6
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  8000,
+                          "rf":  null,
+                          "normal":  1200
+                      },
+        "fb_prices":  {
+                          "cf":  8400,
+                          "rf":  null,
+                          "normal":  1200
+                      }
+    },
+    {
+        "name":  "[Generic] Cut Through the Facade (Red)",
+        "code":  "ANQ013",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  5500,
+                          "rf":  null,
+                          "normal":  400
+                      },
+        "fb_prices":  {
+                          "cf":  9000,
+                          "rf":  null,
+                          "normal":  500
+                      }
+    },
+    {
+        "name":  "[Generic] Ripple Away (Blue)",
+        "code":  "ANQ014",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  9000,
+                          "rf":  null,
+                          "normal":  3500
+                      },
+        "fb_prices":  {
+                          "cf":  10800,
+                          "rf":  null,
+                          "normal":  3600
+                      }
+    },
+    {
+        "name":  "[Generic] Tenacity (Yellow)",
+        "code":  "ANQ015",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3000,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] The Weakest Link (Red)",
+        "code":  "ANQ016",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  9000,
+                          "rf":  null,
+                          "normal":  3500
+                      },
+        "fb_prices":  {
+                          "cf":  14400,
+                          "rf":  null,
+                          "normal":  3000
+                      }
+    },
+    {
+        "name":  "[Generic] Hold the Line (Blue)",
+        "code":  "ANQ017",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  4000,
+                          "rf":  null,
+                          "normal":  250
+                      },
+        "fb_prices":  {
+                          "cf":  4800,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] That All You Got? (Yellow)",
+        "code":  "ANQ018",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  8
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  5000,
+                          "rf":  null,
+                          "normal":  250
+                      },
+        "fb_prices":  {
+                          "cf":  6000,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Call to the Grave (Blue)",
+        "code":  "ANQ019",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  6
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  7500,
+                          "rf":  null,
+                          "normal":  600
+                      },
+        "fb_prices":  {
+                          "cf":  8400,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Gorganian Tome",
+        "code":  "ANQ020",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  7
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  8000,
+                          "rf":  null,
+                          "normal":  250
+                      },
+        "fb_prices":  {
+                          "cf":  8400,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Midas Touch (Yellow)",
+        "code":  "ANQ021",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  9
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  10000,
+                          "rf":  null,
+                          "normal":  1000
+                      },
+        "fb_prices":  {
+                          "cf":  10000,
+                          "rf":  null,
+                          "normal":  800
+                      }
+    },
+    {
+        "name":  "[Generic] Premeditate (Red)",
+        "code":  "ANQ022",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  11
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  10000,
+                          "rf":  null,
+                          "normal":  250
+                      },
+        "fb_prices":  {
+                          "cf":  9600,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Rusted Relic (Blue)",
+        "code":  "ANQ023",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  14
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  10
+                      },
+        "fb_prices":  {
+                          "cf":  1400,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Generic] This Round\u0027s on Me (Blue)",
+        "code":  "ANQ024",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  2,
+                     "rf":  0,
+                     "normal":  16
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  6000,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  9000,
+                          "rf":  null,
+                          "normal":  10
+                      }
+    },
+    {
+        "name":  "[Generic] Truce (Blue)",
+        "code":  "ANQ025",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  150
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  300
+                      }
+    },
+    {
+        "name":  "[Generic] Remembrance (Yellow)",
+        "code":  "ANQ026",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  1,
+                     "rf":  0,
+                     "normal":  10
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  16000,
+                          "rf":  null,
+                          "normal":  2000
+                      },
+        "fb_prices":  {
+                          "cf":  14400,
+                          "rf":  null,
+                          "normal":  2000
+                      }
+    },
+    {
+        "name":  "[Generic] Seduce Secrets (Yellow)",
+        "code":  "ANQ027",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  3,
+                     "rf":  0,
+                     "normal":  12
+                 },
+        "rarity":  "M",
+        "tf_prices":  {
+                          "cf":  3500,
+                          "rf":  null,
+                          "normal":  150
+                      },
+        "fb_prices":  {
+                          "cf":  3600,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Looking for a Scrap (Red)",
+        "code":  "ANQ028",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  16
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Ravenous Rabble (Red)",
+        "code":  "ANQ029",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  19
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Scar for a Scar (Red)",
+        "code":  "ANQ030",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  21
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  50
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Snatch (Red)",
+        "code":  "ANQ031",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  21
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  150
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Pummel (Red)",
+        "code":  "ANQ032",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  20
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  150
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Fate Foreseen (Red)",
+        "code":  "ANQ033",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  22
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Sink Below (Red)",
+        "code":  "ANQ034",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  18
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  300
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Oasis Respite (Red)",
+        "code":  "ANQ035",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  18
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    },
+    {
+        "name":  "[Generic] Sigil of Solace (Red)",
+        "code":  "ANQ036",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  20
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  400
+                      }
+    },
+    {
+        "name":  "[Generic] Fiddler\u0027s Green (Red)",
+        "code":  "ANQ037",
+        "set":  "ANTIQUITY PACK",
+        "qtys":  {
+                     "cf":  0,
+                     "rf":  0,
+                     "normal":  25
+                 },
+        "rarity":  "R",
+        "tf_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  100
+                      },
+        "fb_prices":  {
+                          "cf":  null,
+                          "rf":  null,
+                          "normal":  200
+                      }
+    }
+]
+;
+
+        let activeMode = 1;
+        let searchQuery = "";
+        let filterSet = "all";
+        let filterRarity = "all";
+
+        // Price calculations with scenario bonuses
+        function getTFPrice(card, foilType, mode) {
+            const rawPrice = card.tf_prices[foilType];
+            if (rawPrice === null || rawPrice === undefined) return 0;
+            const bonus = (mode === 3 || mode === 6 || mode === 8) ? 1.15 : 1.0;
+            return Math.round(rawPrice * bonus);
+        }
+
+        // Fable Price calculations
+        function getFablePrice(card, foilType, mode) {
+            const rawPrice = card.fb_prices[foilType];
+            if (rawPrice === null || rawPrice === undefined) return 0;
+            const bonus = (mode === 4 || mode === 7 || mode === 8) ? 1.10 : 1.0;
+            return Math.round(rawPrice * bonus);
+        }
+
+        // Helper to format currency
+        function formatCurrency(val) {
+            return new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 0 }).format(val);
+        }
+
+        // Switch scenario mode
+        function switchMode(modeNum) {
+            activeMode = modeNum;
+            
+            // UI Active update
+            const items = document.querySelectorAll('.mode-item');
+            items.forEach((item, idx) => {
+                if (idx === (modeNum - 1)) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+
+            applyFilters();
+        }
+
+        // Apply search & selector filters, then render
+        function applyFilters() {
+            searchQuery = document.getElementById('search-bar').value.toLowerCase().trim();
+            filterSet = document.getElementById('filter-set').value;
+            filterRarity = document.getElementById('filter-rarity').value;
+
+            // Filter cards array
+            const filtered = CARD_DATA.filter(card => {
+                const matchesSearch = card.name.toLowerCase().includes(searchQuery) || card.code.toLowerCase().includes(searchQuery);
+                const matchesSet = (filterSet === "all" || card.set === filterSet);
+                const matchesRarity = (filterRarity === "all" || card.rarity === filterRarity);
+                return matchesSearch && matchesSet && matchesRarity;
+            });
+
+            // Perform calculations based on the mode
+            if (activeMode <= 4) {
+                renderSingleTable(filtered);
+            } else {
+                renderSplitColumns(filtered);
+            }
+        }
+
+        // Render standard scrollable list table for Mode 1-4
+        function renderSingleTable(cardsList) {
+            let totalValue = 0;
+            let tfTotal = 0;
+            let fbTotal = 0;
+
+            const isTfOnly = (activeMode === 1 || activeMode === 3);
+            const targetSiteName = isTfOnly ? "TOKYO FAB" : "FABLE";
+
+            // Generate HTML table structure
+            let html = `
+                <div class="table-container">
+                    <div class="table-header-block">
+                        出售給 ${targetSiteName} 卡片明細列表 (${cardsList.length} 張符合條件)
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>系列</th>
+                                    <th>卡片編號</th>
+                                    <th>稀有度</th>
+                                    <th>卡片名稱</th>
+                                    <th>庫存數量 (普/RF/CF)</th>
+                                    <th>收購單價</th>
+                                    <th style="text-align: right;">合計</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            cardsList.forEach(card => {
+                let cardTotal = 0;
+                let details = [];
+
+                // Normal copies
+                if (card.qtys.normal > 0) {
+                    const price = isTfOnly ? getTFPrice(card, 'normal', activeMode) : getFablePrice(card, 'normal', activeMode);
+                    if (price > 0) {
+                        cardTotal += card.qtys.normal * price;
+                        details.push(`普: ${card.qtys.normal}x¥${formatCurrency(price)}`);
+                    }
+                }
+
+                // Rainbow Foil
+                if (card.qtys.rf > 0) {
+                    const price = isTfOnly ? getTFPrice(card, 'rf', activeMode) : getFablePrice(card, 'rf', activeMode);
+                    if (price > 0) {
+                        cardTotal += card.qtys.rf * price;
+                        details.push(`RF: ${card.qtys.rf}x¥${formatCurrency(price)}`);
+                    }
+                }
+
+                // Cold Foil
+                if (card.qtys.cf > 0) {
+                    const price = isTfOnly ? getTFPrice(card, 'cf', activeMode) : getFablePrice(card, 'cf', activeMode);
+                    if (price > 0) {
+                        cardTotal += card.qtys.cf * price;
+                        details.push(`CF: ${card.qtys.cf}x¥${formatCurrency(price)}`);
+                    }
+                }
+
+                totalValue += cardTotal;
+                if (isTfOnly) { tfTotal = totalValue; } else { fbTotal = totalValue; }
+
+                if (cardTotal > 0) {
+                    html += `
+                        <tr>
+                            <td>${card.set.replace('OMEN of the third age', 'OMN').replace('COMPENDIUM OF RATHE', 'PEN').replace('ANTIQUITY PACK', 'ANQ')}</td>
+                            <td class="bold-val">${card.code}</td>
+                            <td><span class="card-rarity-badge">${card.rarity}</span></td>
+                            <td style="font-weight: 500;">${card.name}</td>
+                            <td>${card.qtys.normal || '-'} / ${card.qtys.rf || '-'} / ${card.qtys.cf || '-'}</td>
+                            <td class="card-calc-detail">${details.join(' | ') || '不收購'}</td>
+                            <td class="bold-val" style="text-align: right;"><span class="currency-symbol">¥</span>${formatCurrency(cardTotal)}</td>
+                        </tr>
+                    `;
+                }
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('view-render-container').innerHTML = html;
+
+            // Update Metric Cards
+            document.getElementById('metric-total-value').innerHTML = `<span class="currency-symbol">¥</span>` + formatCurrency(totalValue);
+            document.getElementById('metric-tf-value').innerHTML = `<span class="currency-symbol">¥</span>` + formatCurrency(tfTotal);
+            document.getElementById('metric-fb-value').innerHTML = `<span class="currency-symbol">¥</span>` + formatCurrency(fbTotal);
+            document.getElementById('metric-tf-subtext').innerHTML = isTfOnly ? "全數出售給 TOKYO FAB" : "-";
+            document.getElementById('metric-fb-subtext').innerHTML = !isTfOnly ? "全數出售給 FABLE" : "-";
+        }
+
+        // Render split comparison side-by-side lists for Mode 5-8
+        function renderSplitColumns(cardsList) {
+            let totalValue = 0;
+            let tfTotal = 0;
+            let fbTotal = 0;
+
+            const tfItems = [];
+            const fbItems = [];
+
+            cardsList.forEach(card => {
+                const versions = ['normal', 'rf', 'cf'];
+                
+                versions.forEach(v => {
+                    const qty = card.qtys[v];
+                    if (qty > 0) {
+                        const tfPrice = getTFPrice(card, v, activeMode);
+                        const fbPrice = getFablePrice(card, v, activeMode);
+
+                        // If neither site has a price, skip
+                        if (tfPrice === 0 && fbPrice === 0) return;
+
+                        // Allocation decision
+                        const goesToTF = (tfPrice >= fbPrice);
+
+                        if (goesToTF) {
+                            const subtotal = qty * tfPrice;
+                            tfTotal += subtotal;
+                            tfItems.push({
+                                code: card.code,
+                                name: card.name,
+                                rarity: card.rarity,
+                                foil: v,
+                                qty: qty,
+                                price: tfPrice,
+                                subtotal: subtotal
+                            });
+                        } else {
+                            const subtotal = qty * fbPrice;
+                            fbTotal += subtotal;
+                            fbItems.push({
+                                code: card.code,
+                                name: card.name,
+                                rarity: card.rarity,
+                                foil: v,
+                                qty: qty,
+                                price: fbPrice,
+                                subtotal: subtotal
+                            });
+                        }
+                    }
+                });
+            });
+
+            totalValue = tfTotal + fbTotal;
+
+            // Generate HTML for side-by-side allocation
+            let html = `
+                <div class="split-view-container">
+                    <!-- TOKYO FAB Column -->
+                    <div class="split-column">
+                        <div class="split-header">
+                            <div class="split-header-left">
+                                <span class="split-title tf">
+                                    TOKYO FAB <span class="split-badge tf">出價較高</span>
+                                </span>
+                                <span class="split-subtext">分配給 TOKYO FAB 的單卡明細 (${tfItems.length} 項)</span>
+                            </div>
+                            <div class="split-total"><span class="currency-symbol">¥</span>${formatCurrency(tfTotal)}</div>
+                        </div>
+                        <div class="split-list-body">
+            `;
+
+            if (tfItems.length === 0) {
+                html += `<div style="padding: 30px; text-align: center; color: var(--text-secondary); font-size:13px;">無分配卡片</div>`;
+            } else {
+                tfItems.sort((a,b) => b.subtotal - a.subtotal).forEach(item => {
+                    html += `
+                        <div class="card-row-item">
+                            <div class="card-info">
+                                <span class="card-name-code">${item.name}</span>
+                                <div class="card-meta-tags">
+                                    <span class="card-code-tag">${item.code}</span>
+                                    <span class="card-foil-badge ${item.foil}">${item.foil}</span>
+                                    <span class="card-rarity-badge">${item.rarity}</span>
+                                </div>
+                            </div>
+                            <div class="card-pricing-details">
+                                <span class="card-earning-val"><span class="currency-symbol">¥</span>${formatCurrency(item.subtotal)}</span>
+                                <span class="card-calc-detail">數量: ${item.qty} x ¥${formatCurrency(item.price)}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                        </div>
+                    </div>
+
+                    <!-- FABLE Column -->
+                    <div class="split-column">
+                        <div class="split-header">
+                            <div class="split-header-left">
+                                <span class="split-title fb">
+                                    FABLE <span class="split-badge fb">出價較高</span>
+                                </span>
+                                <span class="split-subtext">分配給 FABLE 的單卡明細 (${fbItems.length} 項)</span>
+                            </div>
+                            <div class="split-total"><span class="currency-symbol">¥</span>${formatCurrency(fbTotal)}</div>
+                        </div>
+                        <div class="split-list-body">
+            `;
+
+            if (fbItems.length === 0) {
+                html += `<div style="padding: 30px; text-align: center; color: var(--text-secondary); font-size:13px;">無分配卡片</div>`;
+            } else {
+                fbItems.sort((a,b) => b.subtotal - a.subtotal).forEach(item => {
+                    html += `
+                        <div class="card-row-item">
+                            <div class="card-info">
+                                <span class="card-name-code">${item.name}</span>
+                                <div class="card-meta-tags">
+                                    <span class="card-code-tag">${item.code}</span>
+                                    <span class="card-foil-badge ${item.foil}">${item.foil}</span>
+                                    <span class="card-rarity-badge">${item.rarity}</span>
+                                </div>
+                            </div>
+                            <div class="card-pricing-details">
+                                <span class="card-earning-val"><span class="currency-symbol">¥</span>${formatCurrency(item.subtotal)}</span>
+                                <span class="card-calc-detail">數量: ${item.qty} x ¥${formatCurrency(item.price)}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('view-render-container').innerHTML = html;
+
+            // Update Metric Cards
+            document.getElementById('metric-total-value').innerHTML = `<span class="currency-symbol">¥</span>` + formatCurrency(totalValue);
+            document.getElementById('metric-tf-value').innerHTML = `<span class="currency-symbol">¥</span>` + formatCurrency(tfTotal);
+            document.getElementById('metric-fb-value').innerHTML = `<span class="currency-symbol">¥</span>` + formatCurrency(fbTotal);
+            document.getElementById('metric-tf-subtext').innerHTML = "單卡出價高於 FABLE";
+            document.getElementById('metric-fb-subtext').innerHTML = "單卡出價高於 TOKYO FAB";
+        }
+
+        // Initialize display
+        applyFilters();
+    </script>
+</body>
+</html>

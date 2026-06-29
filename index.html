@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLESH AND BLOOD 庫存銷售決策系統 (6/29更新)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.5);
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark), #1e1b4b);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        h1, h2, h3 {
+            font-family: 'Outfit', sans-serif;
+        }
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        .scenario-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .scenario-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--primary-glow);
+            border-color: var(--primary);
+        }
+        .scenario-btn.active {
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            border-color: #818cf8;
+            box-shadow: 0 0 15px var(--primary-glow);
+            font-weight: bold;
+        }
+        .store-section {
+            animation: fadeIn 0.5s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .alert-box {
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.2), rgba(245, 158, 11, 0.2));
+            border-left: 4px solid #ef4444;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="text-center mb-12 store-section">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">
+                出貨決策最佳化系統 <span class="text-xl text-yellow-300 ml-2">v6.29 即時更新版</span>
+            </h1>
+            <p class="text-slate-400">Flesh and Blood 庫存分拆自動化運算</p>
+        </header>
+
+        <main>
+            <!-- 方案選擇區 -->
+            <section class="glass-card p-6 mb-8 store-section">
+                <h2 class="text-2xl font-bold mb-6 text-indigo-300">📌 選擇銷售方案</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="scenario-buttons">
+                    <!-- Buttons injected by JS -->
+                </div>
+            </section>
+
+            <!-- 總計區 -->
+            <section class="glass-card p-6 mb-8 text-center store-section">
+                <h3 class="text-xl text-slate-300 mb-2">預估總收益</h3>
+                <div class="text-5xl font-bold text-emerald-400" id="grand-total">¥0</div>
+                <div id="alerts-container" class="mt-6 flex flex-col gap-3 items-center">
+                    <!-- Alerts injected by JS -->
+                </div>
+            </section>
+
+            <!-- 出貨清單區 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                
+                <!-- TokyoFAB -->
+                <div class="glass-card p-6 store-section">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                        <h2 class="text-2xl font-bold text-sky-400">📦 賣給 TokyoFAB</h2>
+                        <span class="text-2xl font-bold text-emerald-400" id="tf-total">¥0</span>
+                    </div>
+                    <div class="overflow-y-auto max-h-[600px] pr-2" id="tf-list">
+                        <!-- Items -->
+                    </div>
+                </div>
+
+                <!-- FABLE -->
+                <div class="glass-card p-6 store-section">
+                    <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                        <h2 class="text-2xl font-bold text-fuchsia-400">📦 賣給 FABLE</h2>
+                        <span class="text-2xl font-bold text-emerald-400" id="fb-total">¥0</span>
+                    </div>
+                    <div class="overflow-y-auto max-h-[600px] pr-2" id="fb-list">
+                        <!-- Items -->
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const rawData = [{"set": "OMN", "num": "IAR155", "name": "[Runeblade] Runechant of Pride (Yellow)", "foil": "CF", "qty": 2, "tf": 9000, "fb": 9800}, {"set": "OMN", "num": "IAR156", "name": "[Runeblade] Runechant of Sloth (Yellow)", "foil": "CF", "qty": 2, "tf": 7000, "fb": 9800}, {"set": "OMN", "num": "OMN000", "name": "[Lightning] Voltaris (Blue)", "foil": "RF", "qty": 8, "tf": 33000, "fb": 42000}, {"set": "OMN", "num": "OMN000", "name": "[Lightning] Voltaris (Blue)", "foil": "CF", "qty": 4, "tf": 60000, "fb": 64000}, {"set": "OMN", "num": "OMN001", "name": "[Lightning Illusionist] Zyggy Starlight (Hero)", "foil": "CF", "qty": 5, "tf": 12000, "fb": 0}, {"set": "OMN", "num": "OMN002", "name": "[Lightning Illusionist] Zyggy (Hero)", "foil": "CF", "qty": 10, "tf": 1100, "fb": 0}, {"set": "OMN", "num": "OMN004", "name": "[Lightning Illusionist] Unwinding Finality (Red)", "foil": "普卡", "qty": 61, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN004", "name": "[Lightning Illusionist] Unwinding Finality (Red)", "foil": "CF", "qty": 4, "tf": 4500, "fb": 0}, {"set": "OMN", "num": "OMN005", "name": "[Lightning Illusionist] Flicker Reality (Blue)", "foil": "普卡", "qty": 67, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN005", "name": "[Lightning Illusionist] Flicker Reality (Blue)", "foil": "RF", "qty": 19, "tf": 400, "fb": 0}, {"set": "OMN", "num": "OMN033", "name": "[Lightning Illusionist] Circular Flowtide (Yellow)", "foil": "CF", "qty": 10, "tf": 1200, "fb": 0}, {"set": "OMN", "num": "OMN034", "name": "[Lightning Illusionist] Elliptical Conflux (Yellow)", "foil": "CF", "qty": 11, "tf": 1000, "fb": 0}, {"set": "OMN", "num": "OMN035", "name": "[Lightning Illusionist] Nebulus Cycle (Yellow)", "foil": "CF", "qty": 7, "tf": 1100, "fb": 0}, {"set": "OMN", "num": "OMN036", "name": "[Lightning Illusionist] Crackle from Afar (Blue)", "foil": "CF", "qty": 13, "tf": 800, "fb": 0}, {"set": "OMN", "num": "OMN037", "name": "[Lightning Illusionist] Fleeing Starbreeze (Blue)", "foil": "CF", "qty": 16, "tf": 1200, "fb": 0}, {"set": "OMN", "num": "OMN038", "name": "[Lightning Illusionist] Nourishing Glow (Blue)", "foil": "CF", "qty": 15, "tf": 1500, "fb": 0}, {"set": "OMN", "num": "OMN039", "name": "[Illusionist] Fingers of Fragmentation (Equipment)", "foil": "CF", "qty": 5, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN040", "name": "[Illusionist] Fractal Creation (Blue)", "foil": "普卡", "qty": 73, "tf": 50, "fb": 0}, {"set": "OMN", "num": "OMN040", "name": "[Illusionist] Fractal Creation (Blue)", "foil": "CF", "qty": 13, "tf": 2800, "fb": 3000}, {"set": "OMN", "num": "OMN047", "name": "[Lightning Runeblade] Aurora, Legacy of Tempest (Hero)", "foil": "CF", "qty": 6, "tf": 16000, "fb": 18200}, {"set": "OMN", "num": "OMN048", "name": "[Lightning Runeblade] Aurora, Emissary of Lightning (Hero)", "foil": "CF", "qty": 5, "tf": 1400, "fb": 0}, {"set": "OMN", "num": "OMN050", "name": "[Lightning Runeblade] Snap Fingers (Equipment)", "foil": "CF", "qty": 7, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN051", "name": "[Lightning Runeblade] Tempestuous Kiss (Red)", "foil": "普卡", "qty": 60, "tf": 250, "fb": 0}, {"set": "OMN", "num": "OMN051", "name": "[Lightning Runeblade] Tempestuous Kiss (Red)", "foil": "CF", "qty": 7, "tf": 6000, "fb": 0}, {"set": "OMN", "num": "OMN052", "name": "[Lightning Runeblade] Arcanic Reproach (Blue)", "foil": "普卡", "qty": 65, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN052", "name": "[Lightning Runeblade] Arcanic Reproach (Blue)", "foil": "RF", "qty": 16, "tf": 100, "fb": 0}, {"set": "OMN", "num": "OMN086", "name": "[Runeblade] Gauntlet of Sword and Sorcery (Equipment)", "foil": "RF", "qty": 18, "tf": 3500, "fb": 0}, {"set": "OMN", "num": "OMN086", "name": "[Runeblade] Gauntlet of Sword and Sorcery (Equipment)", "foil": "CF", "qty": 8, "tf": 7000, "fb": 0}, {"set": "OMN", "num": "OMN087", "name": "[Runeblade] Caress of the Reaper (Red)", "foil": "普卡", "qty": 66, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN087", "name": "[Runeblade] Caress of the Reaper (Red)", "foil": "CF", "qty": 11, "tf": 1500, "fb": 0}, {"set": "OMN", "num": "OMN094", "name": "[Lightning Wizard] Oscilio, Forked Continuum (Hero)", "foil": "CF", "qty": 4, "tf": 12000, "fb": 0}, {"set": "OMN", "num": "OMN095", "name": "[Lightning Wizard] Oscilio, Scion of the Third Age (Hero)", "foil": "CF", "qty": 6, "tf": 3000, "fb": 0}, {"set": "OMN", "num": "OMN097", "name": "[Lightning Wizard] Constella Waves (Equipment)", "foil": "CF", "qty": 18, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN098", "name": "[Lightning Wizard] Astral Bridge (Red)", "foil": "普卡", "qty": 72, "tf": 300, "fb": 0}, {"set": "OMN", "num": "OMN098", "name": "[Lightning Wizard] Astral Bridge (Red)", "foil": "CF", "qty": 9, "tf": 6000, "fb": 5600}, {"set": "OMN", "num": "OMN099", "name": "[Lightning Wizard] Echoflash (Yellow)", "foil": "普卡", "qty": 69, "tf": 200, "fb": 0}, {"set": "OMN", "num": "OMN099", "name": "[Lightning Wizard] Echoflash (Yellow)", "foil": "RF", "qty": 16, "tf": 700, "fb": 0}, {"set": "OMN", "num": "OMN133", "name": "[Wizard] Tome of Quandaries (Blue)", "foil": "普卡", "qty": 68, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN133", "name": "[Wizard] Tome of Quandaries (Blue)", "foil": "CF", "qty": 7, "tf": 2500, "fb": 0}, {"set": "OMN", "num": "OMN140", "name": "[Illusionist / Wizard] Third Eye of the Sphinx (Equipment)", "foil": "RF", "qty": 23, "tf": 2500, "fb": 2500}, {"set": "OMN", "num": "OMN140", "name": "[Illusionist / Wizard] Third Eye of the Sphinx (Equipment)", "foil": "CF", "qty": 4, "tf": 8000, "fb": 0}, {"set": "OMN", "num": "OMN141", "name": "[Lightning] Plutonic Starplate (Equipment)", "foil": "RF", "qty": 19, "tf": 6000, "fb": 6000}, {"set": "OMN", "num": "OMN141", "name": "[Lightning] Plutonic Starplate (Equipment)", "foil": "CF", "qty": 9, "tf": 10000, "fb": 9600}, {"set": "OMN", "num": "OMN142", "name": "[Lightning] Constella Tiara (Equipment)", "foil": "CF", "qty": 7, "tf": 10, "fb": 0}, {"set": "OMN", "num": "OMN143", "name": "[Lightning] Starflow Robes (Equipment)", "foil": "CF", "qty": 8, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN144", "name": "[Lightning] Laced Lightning (Equipment)", "foil": "CF", "qty": 7, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN145", "name": "[Lightning] Astral Strike (Red)", "foil": "普卡", "qty": 67, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN145", "name": "[Lightning] Astral Strike (Red)", "foil": "RF", "qty": 19, "tf": 200, "fb": 0}, {"set": "OMN", "num": "OMN146", "name": "[Lightning] Flowstate Embodiment (Red)", "foil": "普卡", "qty": 62, "tf": 1000, "fb": 0}, {"set": "OMN", "num": "OMN146", "name": "[Lightning] Flowstate Embodiment (Red)", "foil": "RF", "qty": 16, "tf": 1400, "fb": 0}, {"set": "OMN", "num": "OMN147", "name": "[Lightning] Static Shelter (Yellow)", "foil": "普卡", "qty": 67, "tf": 900, "fb": 0}, {"set": "OMN", "num": "OMN147", "name": "[Lightning] Static Shelter (Yellow)", "foil": "CF", "qty": 11, "tf": 4000, "fb": 0}, {"set": "OMN", "num": "OMN199", "name": "[Lightning] Sigil of Astral Flow (Blue)", "foil": "CF", "qty": 3, "tf": 2000, "fb": 0}, {"set": "OMN", "num": "OMN201", "name": "[Lightning] Spellbane Sigil (Blue)", "foil": "CF", "qty": 6, "tf": 1000, "fb": 0}, {"set": "OMN", "num": "OMN203A", "name": "[Elemental] Lightning Flow (Token)", "foil": "CF", "qty": 3, "tf": 9000, "fb": 0}, {"set": "OMN", "num": "OMN203B", "name": "[Elemental] Lightning Flow (Token)", "foil": "CF", "qty": 7, "tf": 10000, "fb": 0}, {"set": "OMN", "num": "OMN203C", "name": "[Elemental] Lightning Flow (Token)", "foil": "CF", "qty": 5, "tf": 7500, "fb": 0}, {"set": "OMN", "num": "OMN204", "name": "[Generic] Boots of Omnis Ward (Equipment)", "foil": "RF", "qty": 13, "tf": 8000, "fb": 0}, {"set": "OMN", "num": "OMN204", "name": "[Generic] Boots of Omnis Ward (Equipment)", "foil": "CF", "qty": 7, "tf": 14000, "fb": 0}, {"set": "OMN", "num": "OMN213", "name": "[Generic] Browbeat (Blue)", "foil": "普卡", "qty": 71, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN213", "name": "[Generic] Browbeat (Blue)", "foil": "CF", "qty": 12, "tf": 1800, "fb": 0}, {"set": "OMN", "num": "OMN214", "name": "[Generic] Step Between (Red)", "foil": "普卡", "qty": 73, "tf": 600, "fb": 0}, {"set": "OMN", "num": "OMN214", "name": "[Generic] Step Between (Red)", "foil": "RF", "qty": 21, "tf": 900, "fb": 0}, {"set": "OMN", "num": "OMN215", "name": "[Generic] Tempt Over (Yellow)", "foil": "普卡", "qty": 57, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN215", "name": "[Generic] Tempt Over (Yellow)", "foil": "RF", "qty": 24, "tf": 100, "fb": 0}, {"set": "OMN", "num": "OMN228", "name": "[Assassin] Unmake the Underlings (Blue)", "foil": "普卡", "qty": 72, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN228", "name": "[Assassin] Unmake the Underlings (Blue)", "foil": "RF", "qty": 11, "tf": 1500, "fb": 0}, {"set": "OMN", "num": "OMN229", "name": "[Brute] Feral Instinct (Yellow)", "foil": "普卡", "qty": 61, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN229", "name": "[Brute] Feral Instinct (Yellow)", "foil": "CF", "qty": 10, "tf": 2800, "fb": 0}, {"set": "OMN", "num": "OMN230", "name": "[Guardian] Pile Driver (Weapon)", "foil": "普卡", "qty": 28, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN231", "name": "[Ninja] Swift Pickup (Red)", "foil": "普卡", "qty": 71, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN231", "name": "[Ninja] Swift Pickup (Red)", "foil": "RF", "qty": 9, "tf": 300, "fb": 0}, {"set": "OMN", "num": "OMN232", "name": "[Ninja] Evasive Nageboshi (Blue)", "foil": "普卡", "qty": 26, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN232", "name": "[Ninja] Evasive Nageboshi (Blue)", "foil": "CF", "qty": 3, "tf": 3500, "fb": 0}, {"set": "OMN", "num": "OMN233", "name": "[Ninja] Razor Ring (Blue)", "foil": "普卡", "qty": 24, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN233", "name": "[Ninja] Razor Ring (Blue)", "foil": "CF", "qty": 3, "tf": 3500, "fb": 0}, {"set": "OMN", "num": "OMN234", "name": "[Ninja] Stun Star (Blue)", "foil": "普卡", "qty": 27, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN234", "name": "[Ninja] Stun Star (Blue)", "foil": "CF", "qty": 5, "tf": 3500, "fb": 0}, {"set": "OMN", "num": "OMN235", "name": "[Mechanologist] Gear Turner (Red)", "foil": "普卡", "qty": 67, "tf": 200, "fb": 0}, {"set": "OMN", "num": "OMN235", "name": "[Mechanologist] Gear Turner (Red)", "foil": "CF", "qty": 13, "tf": 3500, "fb": 0}, {"set": "OMN", "num": "OMN236", "name": "[Mechanologist] Arcbane Grasp (Blue)", "foil": "普卡", "qty": 68, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN236", "name": "[Mechanologist] Arcbane Grasp (Blue)", "foil": "CF", "qty": 6, "tf": 2000, "fb": 0}, {"set": "OMN", "num": "OMN237", "name": "[Ranger] Settle the Bill (Red)", "foil": "普卡", "qty": 76, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN237", "name": "[Ranger] Settle the Bill (Red)", "foil": "RF", "qty": 10, "tf": 100, "fb": 0}, {"set": "OMN", "num": "OMN238", "name": "[Warrior] Beckon Steel (Blue)", "foil": "普卡", "qty": 72, "tf": 800, "fb": 0}, {"set": "OMN", "num": "OMN238", "name": "[Warrior] Beckon Steel (Blue)", "foil": "RF", "qty": 15, "tf": 1200, "fb": 0}, {"set": "OMN", "num": "OMN239", "name": "[Pirate Mechanologist] Crash Site Salvage (Yellow)", "foil": "普卡", "qty": 76, "tf": 100, "fb": 0}, {"set": "OMN", "num": "OMN239", "name": "[Pirate Mechanologist] Crash Site Salvage (Yellow)", "foil": "CF", "qty": 12, "tf": 4500, "fb": 0}, {"set": "OMN", "num": "OMN240", "name": "[Pirate Necromancer] Golden Skull (Yellow)", "foil": "CF", "qty": 5, "tf": 2000, "fb": 0}, {"set": "OMN", "num": "OMN240", "name": "[Pirate Necromancer] Golden Skull (Yellow)", "foil": "普卡", "qty": 68, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN241", "name": "[Pirate Ranger] Red Lure Harpoon (Blue)", "foil": "普卡", "qty": 72, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN241", "name": "[Pirate Ranger] Red Lure Harpoon (Blue)", "foil": "RF", "qty": 10, "tf": 300, "fb": 0}, {"set": "OMN", "num": "OMN242", "name": "[Guardian / Warrior] Fortitude of Anvilheim (Equipment)", "foil": "RF", "qty": 17, "tf": 1200, "fb": 0}, {"set": "OMN", "num": "OMN242", "name": "[Guardian / Warrior] Fortitude of Anvilheim (Equipment)", "foil": "CF", "qty": 4, "tf": 7000, "fb": 0}, {"set": "OMN", "num": "OMN243", "name": "[Guardian / Warrior] A Bit off the Side (Red)", "foil": "普卡", "qty": 69, "tf": 100, "fb": 10}, {"set": "OMN", "num": "OMN243", "name": "[Guardian / Warrior] A Bit off the Side (Red)", "foil": "CF", "qty": 13, "tf": 2200, "fb": 0}, {"set": "OMN", "num": "OMN244", "name": "[Light] Blessing of Aegis (Yellow)", "foil": "普卡", "qty": 61, "tf": 50, "fb": 10}, {"set": "OMN", "num": "OMN244", "name": "[Light] Blessing of Aegis (Yellow)", "foil": "CF", "qty": 12, "tf": 2500, "fb": 0}, {"set": "OMN", "num": "OMN245", "name": "[Draconic] Draco Fire (Red)", "foil": "普卡", "qty": 75, "tf": 400, "fb": 0}, {"set": "OMN", "num": "OMN245", "name": "[Draconic] Draco Fire (Red)", "foil": "RF", "qty": 7, "tf": 2000, "fb": 0}, {"set": "OMN", "num": "OMN246", "name": "[Chaos] Induce Panic (Yellow)", "foil": "普卡", "qty": 73, "tf": 0, "fb": 10}, {"set": "OMN", "num": "OMN246", "name": "[Chaos] Induce Panic (Yellow)", "foil": "RF", "qty": 7, "tf": 200, "fb": 0}, {"set": "OMN", "num": "OMN247", "name": "[Reviled Guardian] Lionclaw Maul (Weapon)", "foil": "普卡", "qty": 23, "tf": 10, "fb": 10}, {"set": "OMN", "num": "OMN248", "name": "[Lightning Illusionist] Starfield Veil (Equipment)", "foil": "CF", "qty": 8, "tf": 300, "fb": 0}, {"set": "OMN", "num": "OMN249", "name": "[Lightning Illusionist] Starfield Carapace (Equipment)", "foil": "CF", "qty": 3, "tf": 300, "fb": 0}, {"set": "OMN", "num": "OMN250", "name": "[Lightning Illusionist] Starfield Touch (Equipment)", "foil": "CF", "qty": 3, "tf": 300, "fb": 0}, {"set": "PEN", "num": "PEN001", "name": "[Brute] Savage Claw (Weapon)", "foil": "普卡", "qty": 7, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN006", "name": "[Brute] Reckless Arithmetic (Blue)", "foil": "普卡", "qty": 35, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN006", "name": "[Brute] Reckless Arithmetic (Blue)", "foil": "RF", "qty": 7, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN007", "name": "[Brute] Lay Down the Challenge (Yellow)", "foil": "普卡", "qty": 36, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN015", "name": "[Guardian] Shield Beater (Weapon)", "foil": "普卡", "qty": 14, "tf": 10, "fb": 0}, {"set": "PEN", "num": "PEN020", "name": "[Guardian] Seismic Shift (Red)", "foil": "普卡", "qty": 33, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN020", "name": "[Guardian] Seismic Shift (Red)", "foil": "RF", "qty": 13, "tf": 50, "fb": 10}, {"set": "PEN", "num": "PEN021", "name": "[Guardian] Sense Weakness (Blue)", "foil": "普卡", "qty": 35, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN021", "name": "[Guardian] Sense Weakness (Blue)", "foil": "RF", "qty": 4, "tf": 3000, "fb": 0}, {"set": "PEN", "num": "PEN029", "name": "[Ninja] Wind Cutter (Equipment)", "foil": "普卡", "qty": 21, "tf": 50, "fb": 10}, {"set": "PEN", "num": "PEN029", "name": "[Ninja] Wind Cutter (Equipment)", "foil": "CF", "qty": 3, "tf": 800, "fb": 0}, {"set": "PEN", "num": "PEN034", "name": "[Ninja] Gentle Breeze (Red)", "foil": "普卡", "qty": 35, "tf": 50, "fb": 10}, {"set": "PEN", "num": "PEN034", "name": "[Ninja] Gentle Breeze (Red)", "foil": "RF", "qty": 4, "tf": 1200, "fb": 0}, {"set": "PEN", "num": "PEN035", "name": "[Ninja] Tigerine Reflex (Red)", "foil": "普卡", "qty": 38, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN035", "name": "[Ninja] Tigerine Reflex (Red)", "foil": "RF", "qty": 10, "tf": 250, "fb": 0}, {"set": "PEN", "num": "PEN043", "name": "[Warrior] Templar Spellbane (Equipment)", "foil": "普卡", "qty": 14, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN043", "name": "[Warrior] Templar Spellbane (Equipment)", "foil": "CF", "qty": 6, "tf": 400, "fb": 0}, {"set": "PEN", "num": "PEN048", "name": "[Warrior] Swordmaster's Shine (Red)", "foil": "普卡", "qty": 35, "tf": 500, "fb": 0}, {"set": "PEN", "num": "PEN048", "name": "[Warrior] Swordmaster's Shine (Red)", "foil": "RF", "qty": 9, "tf": 700, "fb": 0}, {"set": "PEN", "num": "PEN049", "name": "[Warrior] Blunten (Yellow)", "foil": "普卡", "qty": 37, "tf": 1200, "fb": 1400}, {"set": "PEN", "num": "PEN049", "name": "[Warrior] Blunten (Yellow)", "foil": "RF", "qty": 4, "tf": 8000, "fb": 9800}, {"set": "PEN", "num": "PEN057", "name": "[Mechanologist] Synapse Sparkcap (Equipment)", "foil": "CF", "qty": 4, "tf": 800, "fb": 0}, {"set": "PEN", "num": "PEN062", "name": "[Mechanologist] Ghost Protocol: Architect (Red)", "foil": "普卡", "qty": 36, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN062", "name": "[Mechanologist] Ghost Protocol: Architect (Red)", "foil": "RF", "qty": 8, "tf": 30, "fb": 0}, {"set": "PEN", "num": "PEN063", "name": "[Mechanologist] Ghost Protocol: Mainframe (Blue)", "foil": "普卡", "qty": 38, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN063", "name": "[Mechanologist] Ghost Protocol: Mainframe (Blue)", "foil": "RF", "qty": 5, "tf": 30, "fb": 0}, {"set": "PEN", "num": "PEN068", "name": "[Mechanologist] Evo Beta Base Head (Blue)", "foil": "CF", "qty": 6, "tf": 1400, "fb": 0}, {"set": "PEN", "num": "PEN069", "name": "[Mechanologist] Evo Beta Base Chest (Blue)", "foil": "CF", "qty": 3, "tf": 1400, "fb": 0}, {"set": "PEN", "num": "PEN070", "name": "[Mechanologist] Evo Beta Base Arms (Blue)", "foil": "CF", "qty": 7, "tf": 1400, "fb": 0}, {"set": "PEN", "num": "PEN071", "name": "[Mechanologist] Evo Beta Base Legs (Blue)", "foil": "CF", "qty": 3, "tf": 1500, "fb": 0}, {"set": "PEN", "num": "PEN078", "name": "[Ranger] Farflight Longbow (Weapon)", "foil": "普卡", "qty": 18, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN083", "name": "[Ranger] Tiger Trap (Red)", "foil": "普卡", "qty": 31, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN084", "name": "[Ranger] Rune Snare (Red)", "foil": "普卡", "qty": 37, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN084", "name": "[Ranger] Rune Snare (Red)", "foil": "RF", "qty": 7, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN092", "name": "[Runeblade] Grimoire of Fellingsong (Equipment)", "foil": "普卡", "qty": 22, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN095", "name": "[Runeblade] Beckoning Haunt (Equipment)", "foil": "CF", "qty": 7, "tf": 1000, "fb": 0}, {"set": "PEN", "num": "PEN097", "name": "[Runeblade] Doomsaying (Red)", "foil": "普卡", "qty": 39, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN097", "name": "[Runeblade] Doomsaying (Red)", "foil": "RF", "qty": 1, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN098", "name": "[Runeblade] Sigil of Gravespawning (Blue)", "foil": "CF", "qty": 6, "tf": 2000, "fb": 3000}, {"set": "PEN", "num": "PEN098", "name": "[Runeblade] Sigil of Gravespawning (Blue)", "foil": "普卡", "qty": 32, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN099", "name": "[Runeblade] Sigil of Silphidae (Blue)", "foil": "CF", "qty": 5, "tf": 1000, "fb": 0}, {"set": "PEN", "num": "PEN106", "name": "[Wizard] Tempest Dancers (Equipment)", "foil": "普卡", "qty": 18, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN106", "name": "[Wizard] Tempest Dancers (Equipment)", "foil": "CF", "qty": 3, "tf": 700, "fb": 0}, {"set": "PEN", "num": "PEN111", "name": "[Wizard] Glyph Destruction Nodes (Yellow)", "foil": "普卡", "qty": 37, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN112", "name": "[Wizard] Temporal Wobble (Red)", "foil": "普卡", "qty": 36, "tf": 150, "fb": 0}, {"set": "PEN", "num": "PEN112", "name": "[Wizard] Temporal Wobble (Red)", "foil": "RF", "qty": 7, "tf": 1000, "fb": 0}, {"set": "PEN", "num": "PEN122", "name": "[Illusionist] Touch of Reality (Equipment)", "foil": "普卡", "qty": 12, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN122", "name": "[Illusionist] Touch of Reality (Equipment)", "foil": "CF", "qty": 1, "tf": 300, "fb": 0}, {"set": "PEN", "num": "PEN127", "name": "[Illusionist] Lunar Mirage (Red)", "foil": "普卡", "qty": 38, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN127", "name": "[Illusionist] Lunar Mirage (Red)", "foil": "RF", "qty": 6, "tf": 300, "fb": 0}, {"set": "PEN", "num": "PEN128", "name": "[Illusionist] Mind Meets Might (Red)", "foil": "普卡", "qty": 37, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN128", "name": "[Illusionist] Mind Meets Might (Red)", "foil": "RF", "qty": 2, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN136", "name": "[Assassin] Graven Gaslight (Equipment)", "foil": "普卡", "qty": 9, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN141", "name": "[Assassin] Lobotomy (Red)", "foil": "普卡", "qty": 36, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN141", "name": "[Assassin] Lobotomy (Red)", "foil": "RF", "qty": 11, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN142", "name": "[Assassin] Seeker Kunai (Red)", "foil": "普卡", "qty": 34, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN142", "name": "[Assassin] Seeker Kunai (Red)", "foil": "RF", "qty": 11, "tf": 30, "fb": 10}, {"set": "PEN", "num": "PEN151", "name": "[Necromancer] Bone Puppetry (Equipment)", "foil": "普卡", "qty": 12, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN151", "name": "[Necromancer] Bone Puppetry (Equipment)", "foil": "CF", "qty": 3, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN156", "name": "[Pirate Necromancer] Boo, Resident Spook (Yellow)", "foil": "普卡", "qty": 37, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN156", "name": "[Pirate Necromancer] Boo, Resident Spook (Yellow)", "foil": "RF", "qty": 3, "tf": 1200, "fb": 0}, {"set": "PEN", "num": "PEN157", "name": "[Pirate Necromancer] Bubba-Lubba, Run Aground (Yellow)", "foil": "RF", "qty": 5, "tf": 1200, "fb": 0}, {"set": "PEN", "num": "PEN157", "name": "[Pirate Necromancer] Bubba-Lubba, Run Aground (Yellow)", "foil": "普卡", "qty": 38, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN167", "name": "[Pirate] Gloves of Azure Waves (Equipment)", "foil": "普卡", "qty": 10, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN167", "name": "[Pirate] Gloves of Azure Waves (Equipment)", "foil": "CF", "qty": 7, "tf": 400, "fb": 0}, {"set": "PEN", "num": "PEN169", "name": "[Pirate] Cheating Scoundrel (Red)", "foil": "普卡", "qty": 35, "tf": 700, "fb": 0}, {"set": "PEN", "num": "PEN169", "name": "[Pirate] Cheating Scoundrel (Red)", "foil": "RF", "qty": 9, "tf": 4500, "fb": 5600}, {"set": "PEN", "num": "PEN179", "name": "[Light] Solforge Gauntlet (Equipment)", "foil": "普卡", "qty": 12, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN179", "name": "[Light] Solforge Gauntlet (Equipment)", "foil": "CF", "qty": 4, "tf": 2500, "fb": 0}, {"set": "PEN", "num": "PEN181", "name": "[Light] Blessing of Bellona (Yellow)", "foil": "普卡", "qty": 37, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN181", "name": "[Light] Blessing of Bellona (Yellow)", "foil": "RF", "qty": 5, "tf": 0, "fb": 0}, {"set": "PEN", "num": "PEN191", "name": "[Shadow] Vestige of Flagellation (Equipment)", "foil": "普卡", "qty": 11, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN191", "name": "[Shadow] Vestige of Flagellation (Equipment)", "foil": "CF", "qty": 5, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN193", "name": "[Shadow] Embalm (Yellow)", "foil": "普卡", "qty": 32, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN193", "name": "[Shadow] Embalm (Yellow)", "foil": "RF", "qty": 5, "tf": 30, "fb": 10}, {"set": "PEN", "num": "PEN205", "name": "[Elemental] Elemental Strike (Red)", "foil": "普卡", "qty": 36, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN205", "name": "[Elemental] Elemental Strike (Red)", "foil": "RF", "qty": 14, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN215", "name": "[Earth] Crown of Everbloom (Equipment)", "foil": "普卡", "qty": 16, "tf": 30, "fb": 10}, {"set": "PEN", "num": "PEN215", "name": "[Earth] Crown of Everbloom (Equipment)", "foil": "CF", "qty": 4, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN217", "name": "[Earth] Channel the Skybreaker (Yellow)", "foil": "普卡", "qty": 33, "tf": 100, "fb": 10}, {"set": "PEN", "num": "PEN217", "name": "[Earth] Channel the Skybreaker (Yellow)", "foil": "CF", "qty": 1, "tf": 1800, "fb": 0}, {"set": "PEN", "num": "PEN227", "name": "[Ice] Crown of Frozen Thoughts (Equipment)", "foil": "普卡", "qty": 9, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN227", "name": "[Ice] Crown of Frozen Thoughts (Equipment)", "foil": "CF", "qty": 8, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN229", "name": "[Ice] Channel Iceloch Glaze (Blue)", "foil": "普卡", "qty": 31, "tf": 50, "fb": 10}, {"set": "PEN", "num": "PEN229", "name": "[Ice] Channel Iceloch Glaze (Blue)", "foil": "CF", "qty": 5, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN239", "name": "[Lightning] Stormweaver's Aegis (Equipment)", "foil": "普卡", "qty": 12, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN239", "name": "[Lightning] Stormweaver's Aegis (Equipment)", "foil": "CF", "qty": 2, "tf": 1000, "fb": 0}, {"set": "PEN", "num": "PEN241", "name": "[Lightning] Astravolt Elemental (Red)", "foil": "普卡", "qty": 35, "tf": 300, "fb": 0}, {"set": "PEN", "num": "PEN241", "name": "[Lightning] Astravolt Elemental (Red)", "foil": "RF", "qty": 3, "tf": 4000, "fb": 0}, {"set": "PEN", "num": "PEN252", "name": "[Draconic] Dynastic Diadem (Equipment)", "foil": "普卡", "qty": 12, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN252", "name": "[Draconic] Dynastic Diadem (Equipment)", "foil": "CF", "qty": 3, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN254", "name": "[Draconic] Art of the Phoenix: War (Red)", "foil": "普卡", "qty": 36, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN254", "name": "[Draconic] Art of the Phoenix: War (Red)", "foil": "RF", "qty": 9, "tf": 600, "fb": 0}, {"set": "PEN", "num": "PEN265", "name": "[Mystic] Rippling Wave (Equipment)", "foil": "普卡", "qty": 9, "tf": 0, "fb": 10}, {"set": "PEN", "num": "PEN265", "name": "[Mystic] Rippling Wave (Equipment)", "foil": "CF", "qty": 5, "tf": 800, "fb": 0}, {"set": "PEN", "num": "PEN267", "name": "[Mystic] Whispering Mist (Blue)", "foil": "普卡", "qty": 35, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN267", "name": "[Mystic] Whispering Mist (Blue)", "foil": "RF", "qty": 2, "tf": 1000, "fb": 1900}, {"set": "PEN", "num": "PEN275", "name": "[Chaos] Havoc Wrap (Equipment)", "foil": "普卡", "qty": 10, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN275", "name": "[Chaos] Havoc Wrap (Equipment)", "foil": "CF", "qty": 6, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN277", "name": "[Chaos] Tome of Pandemonium (Yellow)", "foil": "普卡", "qty": 38, "tf": 50, "fb": 10}, {"set": "PEN", "num": "PEN277", "name": "[Chaos] Tome of Pandemonium (Yellow)", "foil": "RF", "qty": 1, "tf": 4500, "fb": 5600}, {"set": "PEN", "num": "PEN287", "name": "[Revered] Glory Plate (Equipment)", "foil": "普卡", "qty": 16, "tf": 30, "fb": 10}, {"set": "PEN", "num": "PEN287", "name": "[Revered] Glory Plate (Equipment)", "foil": "CF", "qty": 3, "tf": 400, "fb": 0}, {"set": "PEN", "num": "PEN289", "name": "[Revered] By the Book (Blue)", "foil": "普卡", "qty": 40, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN289", "name": "[Revered] By the Book (Blue)", "foil": "RF", "qty": 6, "tf": 30, "fb": 0}, {"set": "PEN", "num": "PEN299", "name": "[Reviled] Two-Faced (Equipment)", "foil": "普卡", "qty": 10, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN299", "name": "[Reviled] Two-Faced (Equipment)", "foil": "CF", "qty": 1, "tf": 1000, "fb": 0}, {"set": "PEN", "num": "PEN301", "name": "[Reviled] Leave 'Em Speechless (Blue)", "foil": "普卡", "qty": 40, "tf": 10, "fb": 0}, {"set": "PEN", "num": "PEN301", "name": "[Reviled] Leave 'Em Speechless (Blue)", "foil": "RF", "qty": 2, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN309", "name": "[Generic] Balance of Justice (Equipment)", "foil": "普卡", "qty": 2, "tf": 13000, "fb": 12600}, {"set": "PEN", "num": "PEN310", "name": "[Generic] Crown of Providence (Equipment)", "foil": "普卡", "qty": 3, "tf": 10000, "fb": 11200}, {"set": "PEN", "num": "PEN311", "name": "[Generic] Fyendal's Spring Tunic (Equipment)", "foil": "普卡", "qty": 2, "tf": 17000, "fb": 16800}, {"set": "PEN", "num": "PEN312", "name": "[Generic] Stonewall Gauntlet (Equipment)", "foil": "普卡", "qty": 5, "tf": 1800, "fb": 1800}, {"set": "PEN", "num": "PEN313", "name": "[Generic] Quickdodge Flexors (Equipment)", "foil": "普卡", "qty": 4, "tf": 9000, "fb": 9800}, {"set": "PEN", "num": "PEN314", "name": "[Generic] Helm of Safe Haven (Equipment)", "foil": "普卡", "qty": 12, "tf": 10, "fb": 10}, {"set": "PEN", "num": "PEN314", "name": "[Generic] Helm of Safe Haven (Equipment)", "foil": "CF", "qty": 6, "tf": 200, "fb": 0}, {"set": "PEN", "num": "PEN319", "name": "[Generic] Command and Conquer (Red)", "foil": "普卡", "qty": 10, "tf": 7500, "fb": 8400}, {"set": "PEN", "num": "PEN320", "name": "[Generic] Enlightened Strike (Red)", "foil": "普卡", "qty": 9, "tf": 3000, "fb": 0}, {"set": "PEN", "num": "PEN321", "name": "[Generic] Shelter from the Storm (Red)", "foil": "普卡", "qty": 13, "tf": 9000, "fb": 9800}, {"set": "PEN", "num": "PEN322", "name": "[Generic] Rockyard Rodeo (Blue)", "foil": "普卡", "qty": 31, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN322", "name": "[Generic] Rockyard Rodeo (Blue)", "foil": "RF", "qty": 8, "tf": 100, "fb": 0}, {"set": "PEN", "num": "PEN323", "name": "[Generic] High Current Currency (Blue)", "foil": "普卡", "qty": 38, "tf": 50, "fb": 0}, {"set": "PEN", "num": "PEN323", "name": "[Generic] High Current Currency (Blue)", "foil": "RF", "qty": 9, "tf": 300, "fb": 0}, {"set": "PEN", "num": "PEN334", "name": "[Brute] Rhinar (Hero)", "foil": "CF", "qty": 2, "tf": 1800, "fb": 0}, {"set": "PEN", "num": "PEN335", "name": "[Ninja] Benji, the Piercing Wind (Hero)", "foil": "CF", "qty": 3, "tf": 1500, "fb": 0}, {"set": "PEN", "num": "PEN336", "name": "[Warrior] Kassai, Cintari Sellsword (Hero)", "foil": "CF", "qty": 3, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN337", "name": "[Mechanologist] Dash, Database (Hero)", "foil": "CF", "qty": 4, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN338", "name": "[Mechanologist] Dash (Hero)", "foil": "CF", "qty": 1, "tf": 2000, "fb": 0}, {"set": "PEN", "num": "PEN339", "name": "[Mechanologist] Teklovossen (Hero)", "foil": "CF", "qty": 2, "tf": 1500, "fb": 0}, {"set": "PEN", "num": "PEN340", "name": "[Ranger] Azalea (Hero)", "foil": "CF", "qty": 3, "tf": 1800, "fb": 0}, {"set": "PEN", "num": "PEN341", "name": "[Ranger] Riptide (Hero)", "foil": "CF", "qty": 2, "tf": 1000, "fb": 0}, {"set": "PEN", "num": "PEN342", "name": "[Wizard] Kano (Hero)", "foil": "CF", "qty": 2, "tf": 3500, "fb": 0}, {"set": "PEN", "num": "PEN343", "name": "[Light Illusionist] Prism (Hero)", "foil": "CF", "qty": 4, "tf": 3000, "fb": 0}, {"set": "PEN", "num": "PEN344", "name": "[Shadow Runeblade] Chane (Hero)", "foil": "CF", "qty": 5, "tf": 3500, "fb": 0}, {"set": "PEN", "num": "PEN345", "name": "[Elemental Guardian] Oldhim (Hero)", "foil": "CF", "qty": 7, "tf": 3000, "fb": 0}, {"set": "PEN", "num": "PEN346", "name": "[Elemental Ranger] Lexi (Hero)", "foil": "CF", "qty": 3, "tf": 5500, "fb": 0}, {"set": "PEN", "num": "PEN347", "name": "[Draconic Illusionist] Dromai (Hero)", "foil": "CF", "qty": 2, "tf": 4000, "fb": 0}, {"set": "PEN", "num": "PEN348", "name": "[Draconic Ninja] Fai (Hero)", "foil": "CF", "qty": 7, "tf": 2500, "fb": 0}, {"set": "ANQ", "num": "ANQ001", "name": "[Generic] Heart of Fyendal (Blue)", "foil": "普卡", "qty": 2, "tf": 44000, "fb": 42000}, {"set": "ANQ", "num": "ANQ003", "name": "[Generic] Riches of Tropal-Dhani (Yellow)", "foil": "普卡", "qty": 2, "tf": 75000, "fb": 80000}, {"set": "ANQ", "num": "ANQ004", "name": "[Generic] Balance of Justice (Equipment)", "foil": "閃卡", "qty": 2, "tf": 23000, "fb": 33600}, {"set": "ANQ", "num": "ANQ005", "name": "[Generic] Crown of Providence (Equipment)", "foil": "閃卡", "qty": 1, "tf": 22000, "fb": 33600}, {"set": "ANQ", "num": "ANQ007", "name": "[Generic] Stonewall Gauntlet (Equipment)", "foil": "閃卡", "qty": 1, "tf": 10000, "fb": 0}, {"set": "ANQ", "num": "ANQ008", "name": "[Generic] Quickdodge Flexors (Equipment)", "foil": "閃卡", "qty": 1, "tf": 18000, "fb": 25200}, {"set": "ANQ", "num": "ANQ009", "name": "[Generic] Command and Conquer (Red)", "foil": "閃卡", "qty": 1, "tf": 26000, "fb": 25200}, {"set": "ANQ", "num": "ANQ010", "name": "[Generic] Shelter from the Storm (Red)", "foil": "閃卡", "qty": 1, "tf": 25000, "fb": 25200}, {"set": "ANQ", "num": "ANQ011", "name": "[Generic] Amnesia (Red)", "foil": "普卡", "qty": 11, "tf": 500, "fb": 0}, {"set": "ANQ", "num": "ANQ012", "name": "[Generic] Censor (Red)", "foil": "普卡", "qty": 6, "tf": 1200, "fb": 0}, {"set": "ANQ", "num": "ANQ012", "name": "[Generic] Censor (Red)", "foil": "閃卡", "qty": 1, "tf": 8000, "fb": 11200}, {"set": "ANQ", "num": "ANQ013", "name": "[Generic] Cut Through the Facade (Red)", "foil": "普卡", "qty": 9, "tf": 400, "fb": 0}, {"set": "ANQ", "num": "ANQ014", "name": "[Generic] Ripple Away (Blue)", "foil": "普卡", "qty": 9, "tf": 3500, "fb": 0}, {"set": "ANQ", "num": "ANQ014", "name": "[Generic] Ripple Away (Blue)", "foil": "閃卡", "qty": 1, "tf": 9000, "fb": 16800}, {"set": "ANQ", "num": "ANQ015", "name": "[Generic] Tenacity (Yellow)", "foil": "普卡", "qty": 9, "tf": 10, "fb": 0}, {"set": "ANQ", "num": "ANQ015", "name": "[Generic] Tenacity (Yellow)", "foil": "閃卡", "qty": 2, "tf": 3000, "fb": 5600}, {"set": "ANQ", "num": "ANQ016", "name": "[Generic] The Weakest Link (Red)", "foil": "普卡", "qty": 12, "tf": 3500, "fb": 0}, {"set": "ANQ", "num": "ANQ016", "name": "[Generic] The Weakest Link (Red)", "foil": "閃卡", "qty": 3, "tf": 9000, "fb": 0}, {"set": "ANQ", "num": "ANQ017", "name": "[Generic] Hold the Line (Blue)", "foil": "普卡", "qty": 10, "tf": 250, "fb": 0}, {"set": "ANQ", "num": "ANQ017", "name": "[Generic] Hold the Line (Blue)", "foil": "閃卡", "qty": 2, "tf": 4000, "fb": 5600}, {"set": "ANQ", "num": "ANQ018", "name": "[Generic] That All You Got? (Yellow)", "foil": "普卡", "qty": 8, "tf": 250, "fb": 0}, {"set": "ANQ", "num": "ANQ019", "name": "[Generic] Call to the Grave (Blue)", "foil": "普卡", "qty": 6, "tf": 600, "fb": 0}, {"set": "ANQ", "num": "ANQ019", "name": "[Generic] Call to the Grave (Blue)", "foil": "閃卡", "qty": 1, "tf": 7500, "fb": 9800}, {"set": "ANQ", "num": "ANQ020", "name": "[Generic] Gorganian Tome", "foil": "普卡", "qty": 7, "tf": 250, "fb": 0}, {"set": "ANQ", "num": "ANQ021", "name": "[Generic] Midas Touch (Yellow)", "foil": "普卡", "qty": 9, "tf": 1000, "fb": 900}, {"set": "ANQ", "num": "ANQ021", "name": "[Generic] Midas Touch (Yellow)", "foil": "閃卡", "qty": 3, "tf": 10000, "fb": 0}, {"set": "ANQ", "num": "ANQ022", "name": "[Generic] Premeditate (Red)", "foil": "普卡", "qty": 11, "tf": 250, "fb": 0}, {"set": "ANQ", "num": "ANQ022", "name": "[Generic] Premeditate (Red)", "foil": "閃卡", "qty": 2, "tf": 10000, "fb": 11200}, {"set": "ANQ", "num": "ANQ023", "name": "[Generic] Rusted Relic (Blue)", "foil": "普卡", "qty": 14, "tf": 10, "fb": 10}, {"set": "ANQ", "num": "ANQ024", "name": "[Generic] This Round's on Me (Blue)", "foil": "普卡", "qty": 16, "tf": 50, "fb": 10}, {"set": "ANQ", "num": "ANQ024", "name": "[Generic] This Round's on Me (Blue)", "foil": "閃卡", "qty": 2, "tf": 6000, "fb": 0}, {"set": "ANQ", "num": "ANQ025", "name": "[Generic] Truce (Blue)", "foil": "普卡", "qty": 10, "tf": 150, "fb": 0}, {"set": "ANQ", "num": "ANQ025", "name": "[Generic] Truce (Blue)", "foil": "閃卡", "qty": 3, "tf": 3500, "fb": 5600}, {"set": "ANQ", "num": "ANQ026", "name": "[Generic] Remembrance (Yellow)", "foil": "普卡", "qty": 10, "tf": 2000, "fb": 0}, {"set": "ANQ", "num": "ANQ026", "name": "[Generic] Remembrance (Yellow)", "foil": "閃卡", "qty": 1, "tf": 16000, "fb": 16800}, {"set": "ANQ", "num": "ANQ027", "name": "[Generic] Seduce Secrets (Yellow)", "foil": "普卡", "qty": 12, "tf": 150, "fb": 0}, {"set": "ANQ", "num": "ANQ027", "name": "[Generic] Seduce Secrets (Yellow)", "foil": "閃卡", "qty": 3, "tf": 3500, "fb": 4200}, {"set": "ANQ", "num": "ANQ028", "name": "[Generic] Looking for a Scrap (Red)", "foil": "普卡", "qty": 16, "tf": 100, "fb": 0}, {"set": "ANQ", "num": "ANQ029", "name": "[Generic] Ravenous Rabble (Red)", "foil": "普卡", "qty": 19, "tf": 100, "fb": 0}, {"set": "ANQ", "num": "ANQ030", "name": "[Generic] Scar for a Scar (Red)", "foil": "普卡", "qty": 21, "tf": 50, "fb": 0}, {"set": "ANQ", "num": "ANQ031", "name": "[Generic] Snatch (Red)", "foil": "普卡", "qty": 21, "tf": 150, "fb": 0}, {"set": "ANQ", "num": "ANQ032", "name": "[Generic] Pummel (Red)", "foil": "普卡", "qty": 20, "tf": 150, "fb": 0}, {"set": "ANQ", "num": "ANQ033", "name": "[Generic] Fate Foreseen (Red)", "foil": "普卡", "qty": 22, "tf": 200, "fb": 0}, {"set": "ANQ", "num": "ANQ034", "name": "[Generic] Sink Below (Red)", "foil": "普卡", "qty": 18, "tf": 300, "fb": 0}, {"set": "ANQ", "num": "ANQ035", "name": "[Generic] Oasis Respite (Red)", "foil": "普卡", "qty": 18, "tf": 100, "fb": 0}, {"set": "ANQ", "num": "ANQ036", "name": "[Generic] Sigil of Solace (Red)", "foil": "普卡", "qty": 20, "tf": 100, "fb": 0}, {"set": "ANQ", "num": "ANQ037", "name": "[Generic] Fiddler's Green (Red)", "foil": "普卡", "qty": 25, "tf": 100, "fb": 0}];
+        
+        const scenarios = [
+            { id: 1, name: "1. 全給 TokyoFAB", tfBonus: 1.0, fbBonus: 1.0, mode: "tf_only" },
+            { id: 2, name: "2. 全給 FABLE", tfBonus: 1.0, fbBonus: 1.0, mode: "fb_only" },
+            { id: 3, name: "3. 全給 TokyoFAB (+15%)", tfBonus: 1.15, fbBonus: 1.0, mode: "tf_only" },
+            { id: 4, name: "4. 全給 FABLE (+10%)", tfBonus: 1.0, fbBonus: 1.10, mode: "fb_only" },
+            { id: 5, name: "5. 原價分拆", tfBonus: 1.0, fbBonus: 1.0, mode: "split" },
+            { id: 6, name: "6. TF加碼分拆 (TF+15% vs FB)", tfBonus: 1.15, fbBonus: 1.0, mode: "split" },
+            { id: 7, name: "7. FB加碼分拆 (TF vs FB+10%)", tfBonus: 1.0, fbBonus: 1.10, mode: "split" },
+            { id: 8, name: "8. 雙方加碼分拆 (TF+15% vs FB+10%)", tfBonus: 1.15, fbBonus: 1.10, mode: "split" },
+            { id: 9, name: "9. 🚫 雙方皆不收清單", tfBonus: 1.0, fbBonus: 1.0, mode: "reject" }
+        ];
+
+        let currentScenario = scenarios[7]; // Default to S8
+
+        function formatCurrency(num) {
+            return "¥" + Math.round(num).toLocaleString();
+        }
+
+        function init() {
+            const btnContainer = document.getElementById('scenario-buttons');
+            scenarios.forEach(s => {
+                const btn = document.createElement('button');
+                btn.className = `scenario-btn py-3 px-4 rounded-xl bg-slate-800 text-sm font-semibold shadow-lg text-slate-300 ${s.id === currentScenario.id ? 'active' : ''}`;
+                btn.innerText = s.name;
+                btn.onclick = () => {
+                    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active', 'text-white'));
+                    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.add('text-slate-300'));
+                    btn.classList.add('active', 'text-white');
+                    btn.classList.remove('text-slate-300');
+                    currentScenario = s;
+                    render();
+                };
+                btnContainer.appendChild(btn);
+            });
+            render();
+        }
+
+        function createCardHTML(item, sellPrice, total) {
+            return `
+                <div class="flex justify-between items-center p-3 mb-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors border border-slate-700/50">
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">
+                            <span class="bg-indigo-900/80 text-indigo-200 px-2 py-0.5 rounded text-[10px] mr-1">${item.set}</span>
+                            ${item.num} | ${item.foil} 
+                        </div>
+                        <div class="font-semibold text-sm text-slate-200 truncate w-48 md:w-64" title="${item.name}">${item.name}</div>
+                        <div class="text-xs text-emerald-400 mt-1">單價: ${formatCurrency(sellPrice)} x ${item.qty}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-bold text-white">${formatCurrency(total)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function render() {
+            let tfTotal = 0;
+            let fbTotal = 0;
+            
+            let tfItemsList = [];
+            let fbItemsList = [];
+
+            rawData.forEach(item => {
+                let tfP = Math.floor(item.tf * currentScenario.tfBonus);
+                let fbP = Math.floor(item.fb * currentScenario.fbBonus);
+
+                let target = '';
+                let finalPrice = 0;
+
+                if (currentScenario.mode === 'reject') {
+                    if (item.tf === 0 && item.fb === 0) {
+                        let linkHtml = `
+                <div class="flex justify-between items-center p-3 mb-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition-colors border border-red-500/30">
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">
+                            <span class="bg-indigo-900/80 text-indigo-200 px-2 py-0.5 rounded text-[10px] mr-1">${item.set}</span>
+                            ${item.num} | ${item.foil} 
+                        </div>
+                        <div class="font-semibold text-sm text-slate-200 truncate w-48 md:w-64" title="${item.name}">${item.name}</div>
+                        <div class="text-xs text-rose-400 mt-1">庫存: ${item.qty} 張</div>
+                    </div>
+                    <div class="text-right">
+                        <a href="https://www.tokyofab.com/view/search?search_keyword=${item.num}" target="_blank" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1 px-3 rounded shadow">
+                            查詢零售價 ↗
+                        </a>
+                    </div>
+                </div>`;
+                        tfItemsList.push({ html: linkHtml, price: 0 });
+                        tfTotal = 0; 
+                        fbTotal = 0;
+                    }
+                } else {
+                    if (currentScenario.mode === 'tf_only') {
+                        target = 'TF';
+                        finalPrice = tfP;
+                    } else if (currentScenario.mode === 'fb_only') {
+                        target = 'FB';
+                        finalPrice = fbP;
+                    } else {
+                        if (tfP >= fbP) {
+                            target = 'TF';
+                            finalPrice = tfP;
+                        } else {
+                            target = 'FB';
+                            finalPrice = fbP;
+                        }
+                    }
+
+                    let rowTotal = finalPrice * item.qty;
+                    if (rowTotal > 0) {
+                        if (target === 'TF') {
+                            tfTotal += rowTotal;
+                            tfItemsList.push({ html: createCardHTML(item, finalPrice, rowTotal), price: finalPrice });
+                        } else {
+                            fbTotal += rowTotal;
+                            fbItemsList.push({ html: createCardHTML(item, finalPrice, rowTotal), price: finalPrice });
+                        }
+                    }
+                }
+            });
+
+            tfItemsList.sort((a, b) => b.price - a.price);
+            fbItemsList.sort((a, b) => b.price - a.price);
+
+            let tfHTML = tfItemsList.map(i => i.html).join('');
+            let fbHTML = fbItemsList.map(i => i.html).join('');
+            
+            let tfHasItems = tfItemsList.length > 0;
+            let fbHasItems = fbItemsList.length > 0;
+
+            if (currentScenario.mode === 'reject') {
+                document.getElementById('tf-list').innerHTML = tfHTML || '<div class="text-center py-8 text-slate-500">太棒了！所有庫存卡片都有人收！</div>';
+                document.getElementById('fb-list').parentElement.style.display = 'none';
+                document.getElementById('tf-list').parentElement.classList.replace('lg:grid-cols-2', 'lg:grid-cols-1');
+                document.querySelector('#tf-list').parentElement.querySelector('h2').innerText = '🚫 雙方皆拒收之庫存卡片';
+                document.querySelector('#tf-list').parentElement.querySelector('span').style.display = 'none';
+                document.getElementById('grand-total').innerText = '---';
+            } else {
+                document.getElementById('fb-list').parentElement.style.display = 'block';
+                document.getElementById('tf-list').parentElement.classList.replace('lg:grid-cols-1', 'lg:grid-cols-2');
+                document.querySelector('#tf-list').parentElement.querySelector('h2').innerText = '📦 賣給 TokyoFAB';
+                document.querySelector('#tf-list').parentElement.querySelector('span').style.display = 'block';
+                document.getElementById('grand-total').innerText = formatCurrency(tfTotal + fbTotal);
+                document.getElementById('tf-total').innerText = formatCurrency(tfTotal);
+                document.getElementById('fb-total').innerText = formatCurrency(fbTotal);
+                document.getElementById('tf-list').innerHTML = tfHTML || '<div class="text-center py-8 text-slate-500">無出貨項目</div>';
+                document.getElementById('fb-list').innerHTML = fbHTML || '<div class="text-center py-8 text-slate-500">無出貨項目</div>';
+            }
+
+            let alerts = '';
+            if (currentScenario.tfBonus > 1.0 && tfHasItems && currentScenario.mode !== 'reject') {
+                alerts += `
+                    <div class="alert-box w-full md:w-2/3 p-3 rounded text-sm text-left flex items-center shadow-lg">
+                        <span class="text-2xl mr-3">⚠️</span>
+                        <div>
+                            <p class="font-bold text-white">記得提醒 TokyoFAB！</p>
+                            <p class="text-slate-300">此方案包含了 TokyoFAB +15% 的溢價，出貨時務必與買家確認加碼 % 數。</p>
+                        </div>
+                    </div>
+                `;
+            }
+            if (currentScenario.fbBonus > 1.0 && fbHasItems && currentScenario.mode !== 'reject') {
+                alerts += `
+                    <div class="alert-box w-full md:w-2/3 p-3 rounded text-sm text-left flex items-center shadow-lg">
+                        <span class="text-2xl mr-3">⚠️</span>
+                        <div>
+                            <p class="font-bold text-white">記得提醒 FABLE！</p>
+                            <p class="text-slate-300">此方案包含了 FABLE +10% 的溢價，出貨時務必與買家確認加碼 % 數。</p>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById('alerts-container').innerHTML = alerts;
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -259,6 +259,8 @@
                 document.querySelector('#tf-list').parentElement.querySelector('h2').innerText = '📦 賣給 TokyoFAB';
                 document.querySelector('#tf-list').parentElement.querySelector('span').style.display = 'block';
                 document.getElementById('grand-total').innerText = formatCurrency(tfTotal + fbTotal);
+                document.getElementById('tf-total').innerText = formatCurrency(tfTotal);
+                document.getElementById('fb-total').innerText = formatCurrency(fbTotal);
                 document.getElementById('tf-list').innerHTML = tfHTML || '<div class="text-center py-8 text-slate-500">無出貨項目</div>';
                 document.getElementById('fb-list').innerHTML = fbHTML || '<div class="text-center py-8 text-slate-500">無出貨項目</div>';
             }
